@@ -43,7 +43,7 @@ exports.getVendors = async (req, res, next) => {
         query = query.sort('-averageRating');
 
         // CRITICAL UPDATE: Select MINIMAL fields AND standardSlots for pricing preview
-        query = query.select('businessName description location averageRating totalCost imageUrls reviewCount category standardSlots');
+        query = query.select('businessName description location averageRating totalCost imageUrls reviewCount category standardSlots email phone');
 
         const vendors = await query;
 
@@ -144,9 +144,10 @@ exports.getVendorBookingCardDetails = async (req, res, next) => {
             availability: finalSlots,
 
             // Contact Info
-            contactEmail: vendor.userId ? vendor.userId.email : 'N/A',
+            contactEmail: vendor.email,
+            phone:vendor.phone
         };
-
+        console.log("carddata",cardData);
         res.status(200).json({ success: true, data: cardData });
         console.log(cardData);
 

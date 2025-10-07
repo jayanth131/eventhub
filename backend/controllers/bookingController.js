@@ -40,7 +40,10 @@ exports.createBooking = async (req, res, next) => {
         eventTimeSlot,
         totalCost,
         eventType,
-        eventHolderNames // Array of names
+        eventHolderNames, // Array of names
+        email,
+        phone
+        
     } = req.body;
 
     console.log(`[DEBUG] 1. Incoming Event Date String: ${eventDate}`);
@@ -112,6 +115,8 @@ exports.createBooking = async (req, res, next) => {
             // --- REDUNDANT BUT NECESSARY DISPLAY FIELDS (Saved from frontend payload) ---
             vendorName: req.body.vendorName,
             vendorLocation: req.body.vendorLocation,
+            email: email,   
+            phone: phone,
             // --- END CRITICAL ADDITION ---
             eventDate: requestedDate, // CRITICAL: Save the normalized date
             eventTimeSlot: eventTimeSlot,
@@ -192,12 +197,14 @@ exports.getCustomerBookings = async (req, res, next) => {
             paid: booking.advanceAmountPaid,
             balance: booking.remainingBalance,
             status: booking.bookingStatus,
+            
 
             // Vendor Details (populated)
             vendorName: booking.vendor.businessName, // Mapped correctly
             vendorLocation: booking.vendor.location, // Mapped correctly
             vendorImage: booking.vendor.imageUrls[0] || 'https://placehold.co/800x600/8B0000/FFD700?text=Venue',
-            vendorEmail: booking.vendor.email, // Placeholder for email
+            vendorEmail: booking.email, // Placeholder for email
+            vendorPhone: booking.phone, // Placeholder for phone
 
             // Event Details
             eventHolderNames: booking.eventHolderNames,

@@ -106,7 +106,9 @@ export default function MyBookings({ user, onNavigateHome, onLogout }: MyBooking
 
         total: b.total,
         paid: b.paid,
-        balance: b.balance
+        balance: b.balance,
+        Phone: b.vendorPhone,
+      
 
       }));
 
@@ -427,7 +429,6 @@ export default function MyBookings({ user, onNavigateHome, onLogout }: MyBooking
                                           <h3 className="text-xl text-[var(--royal-maroon)] mb-1">{booking.vendorName}</h3>
                                           <p className="text-[var(--royal-gold)]">{booking.serviceCategory}</p>
                                         </div>
-                                        {console.log(booking)}
 
 
 
@@ -457,7 +458,7 @@ export default function MyBookings({ user, onNavigateHome, onLogout }: MyBooking
                                         <div className="flex items-center space-x-4 text-sm pt-2 border-t border-[var(--royal-gold)]/20">
                                           <div className="flex items-center text-gray-600">
                                             <Phone className="h-4 w-4 mr-1" />
-                                            <span>{8555025407}</span>
+                                            <span>{booking.Phone}</span>
                                           </div>
                                           <div className="flex items-center text-gray-600">
                                             <Mail className="h-4 w-4 mr-1" />

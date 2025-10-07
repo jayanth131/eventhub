@@ -56,7 +56,7 @@ exports.registerCustomer = async (req, res, next) => {
 // @route   POST /api/auth/signup/vendor
 // @access  Public
 exports.registerVendor = async (req, res, next) => {
-    const { username, email, password, businessName, category, location, roleRef } = req.body; 
+    const { username, email, password, businessName, category,phone, location, roleRef } = req.body; 
 
     try {
         const user = new User({ username, email, password, role: 'vendor', roleRef });
@@ -69,7 +69,7 @@ exports.registerVendor = async (req, res, next) => {
             email,
             category,
             location,
-            phone_number: req.body.phone_number, // New required field
+            phone, // New required field
             // New fields will default to 0 and 5000 if not provided in signup payload.
             // If you wanted to set initial values:
             // totalCost: req.body.totalCost || 0,

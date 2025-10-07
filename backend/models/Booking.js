@@ -16,6 +16,8 @@ const BookingSchema = new mongoose.Schema({
         enum: ['Function Hall', 'Music', 'Decoration', 'Car', 'Catering', 'Pandit'],
         required: true
     },
+    email: { type: String, required: true }, // Customer email at time of booking
+    phone: { type: String, required: true }, // Customer phone at time of booking
 
     // --- NEW FIELDS ADDED FOR CUSTOMER DISPLAY ---
     eventHolderNames: {

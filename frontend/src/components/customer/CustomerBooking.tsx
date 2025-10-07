@@ -154,6 +154,8 @@ const CustomerBooking: React.FC<CustomerBookingProps> = ({
         location: v.location,
         totalCost: v.totalCost,
         imageUrls: v.imageUrls || [],
+        email:v.email,
+        Phone:v.phone,
         description: v.description,
         // Ensure availability is undefined initially for the button logic
         availability: v.availability // Should be undefined/null from the fast endpoint
@@ -161,6 +163,7 @@ const CustomerBooking: React.FC<CustomerBookingProps> = ({
 
       setVendorsList(mappedVendors);
       console.log(`[LOG] Successfully loaded ${mappedVendors.length} vendors for list view.`);
+      console.log("mappedvendors",mappedVendors);
 
     } catch (err: any) {
       setErrorList(`Failed to load vendors: ${err.message}`);
@@ -255,7 +258,8 @@ const CustomerBooking: React.FC<CustomerBookingProps> = ({
       vendorLocation: selectedVendor.location, // Redundant but useful for records
       // Transactional fields
       totalCost: selectedSlot.price, // CRITICAL: Price of the specific slot
-
+      email:selectedVendor.contactEmail,
+      phone: selectedVendor.Phone,
       // Event Detail Fields
       eventDate: selectedDate.toISOString(), // CRITICAL: Uses ISO string for backend normalization
       eventTimeSlot: selectedSlot.time,
@@ -265,7 +269,6 @@ const CustomerBooking: React.FC<CustomerBookingProps> = ({
       eventHolderNames: eventHolderNames, // The array of names
     };
 
-    console.log("[LOG] Submitting booking payload:", bookingPayload);
 
     try {
       await submitBooking(bookingPayload);
@@ -797,7 +800,7 @@ const CustomerBooking: React.FC<CustomerBookingProps> = ({
                   <div className="space-y-2 pt-4 border-t border-[var(--royal-gold)]/30">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Total Amount:</span>
-                      <span className="text-xl text-[var(--royal-maroon)]">₹{selectedSlot.price.toLocaleString()}</span>
+                      <span className="text-xl text-[var(--royal-maroon)]">₹{selectedSlot.price}</span>
                     </div>
                     {/* {console.log("selected vendor",selectedVendor)} */}
                     <div className="flex justify-between">

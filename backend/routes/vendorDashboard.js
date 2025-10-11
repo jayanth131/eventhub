@@ -1,11 +1,11 @@
-// routes/vendorDashboard.js
 const express = require('express');
 const { 
     getDashboardSummary, 
     cancelBookingVendor, 
     completeBooking,
     blockManualSlot 
-} = require('../controllers/vendorController'); // Note: We'll modify vendorController
+} = require('../controllers/vendorController');
+// const { getCustomerBookings } = require('../controllers/bookingController'); //
 const { protect, authorize } = require('../middleware/auth');
 
 const router = express.Router();
@@ -15,6 +15,9 @@ router.use(protect, authorize('vendor'));
 
 // Fetch summary data for the dashboard (Bookings, Revenue Graphs)
 router.get('/summary', getDashboardSummary);
+
+// ✅ New Route: Allow vendor to view customer bookings (maybe their own vendor-related ones)
+// router.get('/bookings', getCustomerBookings);
 
 // Vendor-side action: Cancel a specific booking
 router.put('/booking/:bookingId/cancel', cancelBookingVendor);

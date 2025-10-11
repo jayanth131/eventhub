@@ -174,54 +174,89 @@ exports.createBooking = async (req, res, next) => {
 // @route   GET /api/bookings/me
 // @access  Private (Customer Only)
 exports.getCustomerBookings = async (req, res, next) => {
+    console.log("fetching customer bookings started")
     try {
-        const customerId = req.user.id; // Get ID from authenticated user
+        let query = {};
+        let populateVendor = true;
 
-        // Fetch all bookings belonging to this customer
-        const bookings = await Booking.find({ customer: customerId })
+        if (req.user.role === 'customer') {
+            // 📌 Customer — fetch bookings where the user is the customer
+            query = { customer: req.user.id };
+        } else if (req.user.role === 'vendor') {
+            // 📌 Vendor — fetch bookings where the vendor is the profileId (vendorId)
+            query = { vendor: req.user.profileId };
+            populateVendor = false; // vendor already knows their info
+        } else {
+            return res.status(403).json({
+                success: false,
+                message: 'Unauthorized: Only customers or vendors can access bookings.'
+            });
+        }
+
+        console.log("Booking query:", query);
+
+        // 🔸 Fetch bookings
+        const bookings = await Booking.find(query)
             .select('-__v -updatedAt')
-            .populate({
-                path: 'vendor',
-                // CRITICAL FIX: Explicitly select businessName and location
-                select: 'businessName location imageUrls'
-            })
-            .sort('-eventDate'); // Sort newest first
+            .populate(
+                populateVendor
+                    ? {
+                        path: 'vendor',
+                        select: 'businessName location imageUrls'
+                    }
+                    : {
+                        path: 'customer',
+                        select: 'username email phone'
+                    }
+            )
+            .sort('-eventDate');
+            console.log("Raw bookings fetched:", bookings);
 
-        // Transform data for clean frontend display
-        const transformedBookings = bookings.map(booking => ({
+        // 🔸 Transform for frontend
+        const transformed = bookings.map(booking => ({
             id: booking._id,
             bookingId: booking._id,
-            date: booking.eventDate.toISOString().split('T')[0], // YYYY-MM-DD
+            date: booking.eventDate.toISOString().split('T')[0],
             time: booking.eventTimeSlot,
             total: booking.totalCost,
             paid: booking.advanceAmountPaid,
             balance: booking.remainingBalance,
             status: booking.bookingStatus,
-            
+            phone: booking.phone,
 
-            // Vendor Details (populated)
-            vendorName: booking.vendor.businessName, // Mapped correctly
-            vendorLocation: booking.vendor.location, // Mapped correctly
-            vendorImage: booking.vendor.imageUrls[0] || 'https://placehold.co/800x600/8B0000/FFD700?text=Venue',
-            vendorEmail: booking.email, // Placeholder for email
-            vendorPhone: booking.phone, // Placeholder for phone
+            ...(req.user.role === 'customer'
+                ? {
+                    vendorName: booking.vendor?.businessName || 'N/A',
+                    vendorLocation: booking.vendor?.location || 'N/A',
+                    vendorImage:
+                        booking.vendor?.imageUrls?.[0] ||
+                        'https://placehold.co/800x600/8B0000/FFD700?text=Venue'
+                }
+                : {
+                    customerName: booking.customer?.username || 'N/A',
+                    customerEmail: booking.customer?.email || 'N/A',
+                    customerPhone: booking.customer?.phone || 'N/A'
+                }),
 
-            // Event Details
             eventHolderNames: booking.eventHolderNames,
             eventType: booking.eventType
         }));
-        console.log(bookings)
-        console.log(transformedBookings)
+
+        console.log("Transformed bookings:", transformed);
+        console.log("fetching customer bookings ended")
 
         res.status(200).json({
             success: true,
-            count: transformedBookings.length,
-            data: transformedBookings
+            count: transformed.length,
+            data: transformed
         });
 
     } catch (error) {
-        console.error("Error fetching customer bookings:", error);
-        res.status(500).json({ success: false, message: 'Failed to retrieve your booking history.' });
+        console.error("Error fetching bookings:", error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to retrieve booking history.'
+        });
     }
 };
 

@@ -199,8 +199,6 @@ exports.getDashboardSummary = async (req, res, next) => {
 
     try {
         // --- 1. Fetch Today's & Upcoming Bookings ---
-
-        // Find bookings for this vendor, confirmed status, starting today or later
         const upcomingBookings = await Booking.find({
             vendor: vendorId,
             bookingStatus: { $in: ['confirmed', 'pending_vendor'] }, // Confirmed or pending acceptance
@@ -209,12 +207,12 @@ exports.getDashboardSummary = async (req, res, next) => {
             .select('eventDate eventTimeSlot totalCost remainingBalance customer')
             .populate({
                 path: 'customer',
-                select: 'username email' // Populate customer info
+                select: 'username email' 
             })
             .sort('eventDate eventTimeSlot');
 
-        const todaysBookings = upcomingBookings.filter(booking =>
-            normalizeDate(booking.eventDate).getTime() === today.getTime()
+        const todaysBookings = upcomingBookings.filter(
+            booking => normalizeDate(booking.eventDate).getTime() === today.getTime()
         );
 
         // --- 2. Calculate Revenue Metrics (Aggregation) ---
@@ -235,7 +233,17 @@ exports.getDashboardSummary = async (req, res, next) => {
                             $cond: [{ $eq: ['$bookingStatus', 'completed'] }, '$totalCost', 0]
                         }
                     },
-                    totalCanceled: { $sum: { $cond: [{ $in: ['$bookingStatus', ['canceled_customer', 'canceled_vendor']] }, 1, 0] } }
+                    totalCanceled: { 
+                        $sum: { 
+                            $cond: [
+                                { $in: ['$bookingStatus', ['canceled_customer', 'canceled_vendor']] }, 
+                                1, 
+                                0
+                            ] 
+                        } 
+                    },
+                    // ✅ New: Count total confirmed + completed bookings
+                    totalBookingsCount: { $sum: 1 }
                 }
             }
         ]);
@@ -245,11 +253,13 @@ exports.getDashboardSummary = async (req, res, next) => {
         res.status(200).json({
             success: true,
             data: {
-                todaysBookings: todaysBookings,
+                todaysBookings,
                 upcomingEventsCount: upcomingBookings.length,
                 overallRevenue: revenueData.totalRevenue || 0,
                 completedRevenue: revenueData.totalCompleted || 0,
                 cancellationCount: revenueData.totalCanceled || 0,
+                advanceReceived: revenueData.totalAdvance || 0,
+                totalBookingsCount: revenueData.totalBookingsCount || 0   // ✅ Added field
             }
         });
 

@@ -78,6 +78,8 @@ exports.getVendor = async (req, res, next) => {
 exports.getVendorBookingCardDetails = async (req, res, next) => {
     try {
         const vendorProfileId = req.params.vendorId;
+        console.log("Vendor ID for details fetch:", vendorProfileId);
+
         // 1. Get the requested date from query parameters
         const requestedDate = req.query.date ? normalizeDate(req.query.date) : null;
 
@@ -147,9 +149,9 @@ exports.getVendorBookingCardDetails = async (req, res, next) => {
             contactEmail: vendor.email,
             phone:vendor.phone
         };
-        console.log("carddata",cardData);
+        // console.log("carddata",cardData);
         res.status(200).json({ success: true, data: cardData });
-        console.log(cardData);
+        // console.log(cardData);
 
     } catch (err) {
         console.error("Error fetching vendor card details for expansion:", err);

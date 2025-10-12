@@ -33,56 +33,65 @@ const normalizeDate = (dateInput) => {
 // @route   POST /api/bookings
 // @access  Private (Customer only)
 exports.createBooking = async (req, res, next) => {
-    // 1. Get data from request body and authenticated user
-    const {
-        vendorId,
-        eventDate, // Date string from frontend
-        eventTimeSlot,
-        totalCost,
-        eventType,
-        eventHolderNames, // Array of names
-        email,
-        phone
-        
-    } = req.body;
+    const userRole = req.user.role; // 'customer' or 'vendor'
+    const userId = req.user.id;
+    console.log(req.body)
 
-    console.log(`[DEBUG] 1. Incoming Event Date String: ${eventDate}`);
-
-    const customerId = req.user.id; // From the JWT token
-
-    // Start a Mongoose session for transactional guarantees
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
-        // --- 1. Find Vendor and retrieve ALL necessary display fields ---
-        const vendor = await VendorProfile.findById(vendorId).select('category availability advancePaymentAmount').session(session);
+        let finalVendorId;
+        let finalCustomerId;
+        let eventType;
+        let eventHolderNames;
+        let totalCost;
+        let advanceAmountPaid;
+        let email;
+        let phone;
+
+        if (userRole === 'customer') {
+            // --- Customer Booking ---
+            finalVendorId = req.body.vendorId;
+            finalCustomerId = userId;
+            eventType = req.body.eventType;
+            eventHolderNames = req.body.eventHolderNames; // array of names
+            totalCost = req.body.totalCost;
+            advanceAmountPaid = req.body.advancePaid;
+            email = req.body.email;
+            phone = req.body.phone;
+        } else if (userRole === 'vendor') {
+            // --- Vendor Offline Booking for Walk-in Customer ---
+            finalVendorId = req.user.profileId;
+            finalCustomerId = req.body.customerId || null; // optional if walk-in
+            eventType = req.body.eventType;
+            eventHolderNames = req.body.eventHolderNames; // vendor sends customer name
+            totalCost = req.body.totalCost;
+            advanceAmountPaid = req.body.advancePaid;
+            console.log(advanceAmountPaid) // vendor may pay partial/full or 0
+            email = req.body.email || null;
+            phone = req.body.phone || null;
+        } else {
+            await session.abortTransaction();
+            return res.status(403).json({ success: false, message: 'Unauthorized user role.' });
+        }
+
+        // --- Find Vendor ---
+        const vendor = await VendorProfile.findById(finalVendorId)
+            .select('category availability advancePaymentAmount')
+            .session(session);
+
         if (!vendor) {
             await session.abortTransaction();
             return res.status(404).json({ success: false, message: 'Vendor not found.' });
         }
 
-        // CRITICAL: Use the fixed advance payment amount from the VendorProfile
-        const advanceAmountPaid = vendor.advancePaymentAmount;
-
-        // **Critical: Check if the slot is free**
-        const requestedDate = normalizeDate(eventDate);
-
-        console.log(`[DEBUG] 2. Backend Normalized Date (for saving/checking): ${requestedDate.toISOString()}`);
-
+        const requestedDate = normalizeDate(req.body.eventDate);
         let isSlotAvailable = true;
 
-        // Find the date entry in the vendor's availability array
-        const dayEntry = vendor.availability.find(item => {
-            // item.date is a Date object from Mongoose, so normalizeDate must handle it.
-            const itemDate = normalizeDate(item.date);
-            return itemDate.getTime() === requestedDate.getTime();
-        });
-
-
-        // Check if the specific time slot is already booked or manually blocked
+        const dayEntry = vendor.availability.find(item => normalizeDate(item.date).getTime() === requestedDate.getTime());
         if (dayEntry) {
-            const slot = dayEntry.slots.find(s => s.time === eventTimeSlot);
+            const slot = dayEntry.slots.find(s => s.time === req.body.eventTimeSlot);
             if (slot && slot.status !== 'available') {
                 isSlotAvailable = false;
             }
@@ -93,82 +102,78 @@ exports.createBooking = async (req, res, next) => {
             return res.status(400).json({ success: false, message: 'Requested slot is already booked or unavailable.' });
         }
 
-        // --- 2. Process Advance Payment (Mock) ---
-        const paymentResult = { status: 'success', transactionId: `TRX-${Date.now()}` };
+        // --- Payment & Booking Status ---
+        let paymentStatus = 'paid_advance';
+        let bookingStatus = 'confirmed';
 
-        if (paymentResult.status !== 'success') {
-            await session.abortTransaction();
-            return res.status(400).json({ success: false, message: 'Payment processing failed.' });
+        if (userRole === 'vendor') {
+            // Offline vendor booking → manual
+            paymentStatus = 'manual';
+            bookingStatus = 'confirmed';
+            if (!advanceAmountPaid) advanceAmountPaid = 0;
         }
 
-        // --- 3. Create the Booking Record ---
-        // Use the fetched advanceAmountPaid for calculation
         const remainingBalance = totalCost - advanceAmountPaid;
 
+        // --- Create Booking ---
         const newBooking = await Booking.create([{
-            customer: customerId,
-            vendor: vendorId,
-            serviceCategory: vendor.category, // Automatically use vendor's primary category
-            // --- CRITICAL ADDITION: Event Details ---
-            eventType: eventType,
-            eventHolderNames: eventHolderNames,
-            // --- REDUNDANT BUT NECESSARY DISPLAY FIELDS (Saved from frontend payload) ---
-            vendorName: req.body.vendorName,
-            vendorLocation: req.body.vendorLocation,
-            email: email,   
-            phone: phone,
-            // --- END CRITICAL ADDITION ---
-            eventDate: requestedDate, // CRITICAL: Save the normalized date
-            eventTimeSlot: eventTimeSlot,
-            totalCost: totalCost,
-            advanceAmountPaid: advanceAmountPaid, // Use the fixed amount from profile
-            remainingBalance: remainingBalance,
-            paymentStatus: 'paid_advance',
-            bookingStatus: 'confirmed'
-        }], { session: session });
+            customer: finalCustomerId,
+            vendor: finalVendorId,
+            serviceCategory: vendor.category,
+            eventType,
+            eventHolderNames,
+            vendorName: req.body.vendorName || vendor.name,
+            vendorLocation: req.body.vendorLocation || "",
+            email,
+            phone,
+            eventDate: requestedDate,
+            eventTimeSlot: req.body.eventTimeSlot,
+            totalCost,
+            advanceAmountPaid,
+            remainingBalance,
+            paymentStatus,
+            bookingStatus
+        }], { session });
 
-        // --- 4. Update Vendor Availability (Mark as Booked) ---
-
-        // Check if day entry exists, or create a new one (unchanged logic)
+        // --- Update Vendor Availability ---
         if (!dayEntry) {
-            // New date entry for the vendor
             vendor.availability.push({
-                date: requestedDate, // Save the normalized date
-                slots: [{ time: eventTimeSlot, status: 'booked' }]
+                date: requestedDate,
+                slots: [{ time: req.body.eventTimeSlot, status: 'booked' }]
             });
         } else {
-            // Update existing date entry
-            let slot = dayEntry.slots.find(s => s.time === eventTimeSlot);
+            const slot = dayEntry.slots.find(s => s.time === req.body.eventTimeSlot);
             if (slot) {
                 slot.status = 'booked';
             } else {
-                // Slot not found for this date, push a new one
-                dayEntry.slots.push({ time: eventTimeSlot, status: 'booked' });
+                dayEntry.slots.push({ time: req.body.eventTimeSlot, status: 'booked' });
             }
         }
 
-        // Save the updated vendor document
-        await vendor.save({ session: session });
+        await vendor.save({ session });
 
-        // --- 5. Commit Transaction ---
         await session.commitTransaction();
         session.endSession();
+        console.log('New Booking Created:', newBooking[0]);
 
         res.status(201).json({
             success: true,
-            message: 'Booking successfully confirmed! Check your dashboard.',
+            message: userRole === 'vendor'
+                ? 'Offline booking successfully created!'
+                : 'Booking successfully confirmed! Check your dashboard.',
             data: newBooking[0]
         });
 
     } catch (error) {
-        // Rollback transaction on any error
         await session.abortTransaction();
         session.endSession();
-        console.error("Booking Creation Error:", error);
-        res.status(500).json({ success: false, message: 'Failed to create booking: ' + error.message });
+        console.error('Booking Creation Error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to create booking: ' + error.message
+        });
     }
 };
-
 // --- NEW FUNCTION TO BE ADDED ---
 // @desc    Get all bookings for the authenticated customer
 // @route   GET /api/bookings/me
@@ -193,7 +198,7 @@ exports.getCustomerBookings = async (req, res, next) => {
             });
         }
 
-        console.log("Booking query:", query);
+        // console.log("Booking query:", query);
 
         // 🔸 Fetch bookings
         const bookings = await Booking.find(query)
@@ -202,7 +207,7 @@ exports.getCustomerBookings = async (req, res, next) => {
                 populateVendor
                     ? {
                         path: 'vendor',
-                        select: 'businessName location imageUrls'
+                        select: 'businessName location imageUrls email phone vendor'
                     }
                     : {
                         path: 'customer',
@@ -210,10 +215,11 @@ exports.getCustomerBookings = async (req, res, next) => {
                     }
             )
             .sort('-eventDate');
-            console.log("Raw bookings fetched:", bookings);
+            // console.log("Raw bookings fetched:", bookings);
 
         // 🔸 Transform for frontend
         const transformed = bookings.map(booking => ({
+            profileId:booking.vendor,
             id: booking._id,
             bookingId: booking._id,
             date: booking.eventDate.toISOString().split('T')[0],
@@ -223,6 +229,7 @@ exports.getCustomerBookings = async (req, res, next) => {
             balance: booking.remainingBalance,
             status: booking.bookingStatus,
             phone: booking.phone,
+            email: booking.email,    
 
             ...(req.user.role === 'customer'
                 ? {
@@ -243,7 +250,7 @@ exports.getCustomerBookings = async (req, res, next) => {
         }));
 
         console.log("Transformed bookings:", transformed);
-        console.log("fetching customer bookings ended")
+        // console.log("fetching customer bookings ended")
 
         res.status(200).json({
             success: true,

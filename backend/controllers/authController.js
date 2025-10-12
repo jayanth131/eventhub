@@ -115,8 +115,9 @@ exports.login = async (req, res, next) => {
         }
 
         sendTokenResponse(user, 200, res);
+        console.log("Login successful for user:", user);
 
     } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
+        res.status(500).json({ success: false, message: err.message });     
     }
 };

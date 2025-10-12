@@ -19,6 +19,7 @@ interface User {
   name: string;
   email: string;
   role: 'customer' | 'vendor';
+  
 }
 
 interface LoginPageProps {
@@ -115,7 +116,8 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       }
 
       // --- Success Handling ---
-      const { token, role, userId } = response;
+      const { token, role, userId,profileId } = response;
+      console.log("API response:", response);
 
       // 1. Store Token (Essential for all protected API calls)
       localStorage.setItem('authToken', token);
@@ -126,7 +128,10 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         name: formData.name || formData.username || formData.email, // Use best available name
         email: formData.email,
         role: role,
+        profileId: profileId,
       };
+
+      console.log("Authenticated user:", userDetails);
 
       // 3. Navigate the user (handled by parent component via onLogin)
       onLogin(userDetails); 

@@ -4,7 +4,7 @@ const BookingSchema = new mongoose.Schema({
     customer: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
-        required: true
+        required: false
     },
     vendor: {
         type: mongoose.Schema.Types.ObjectId,
@@ -14,7 +14,7 @@ const BookingSchema = new mongoose.Schema({
     serviceCategory: {
         type: String,
         enum: ['Function Hall', 'Music', 'Decoration', 'Car', 'Catering', 'Pandit'],
-        required: true
+        required: false
     },
     email: { type: String, required: true }, // Customer email at time of booking
     phone: { type: String, required: true }, // Customer phone at time of booking
@@ -31,11 +31,11 @@ const BookingSchema = new mongoose.Schema({
     // CRITICAL ADDITIONS: Saving display information
     vendorName: {
         type: String, // The vendor's business name at time of booking
-        required: true,
+        required: false,
     },
     vendorLocation: {
         type: String, // The vendor's location at time of booking
-        required: true,
+        required: false,
     },
     // --- END NEW FIELDS ---
 
@@ -62,12 +62,12 @@ const BookingSchema = new mongoose.Schema({
     },
     paymentStatus: {
         type: String,
-        enum: ['pending', 'paid_advance', 'paid_full', 'failed'],
+        enum: ['pending', 'paid_advance', 'paid_full', 'failed', 'manual'],
         default: 'pending'
     },
     bookingStatus: {
         type: String,
-        enum: ['confirmed', 'pending_vendor', 'canceled_customer', 'canceled_vendor', 'completed'],
+        enum: ['confirmed', 'pending_vendor', 'canceled_customer', 'canceled_vendor', 'completed','manulaly_confirmed'],
         default: 'confirmed'
     },
     notes: { type: String }

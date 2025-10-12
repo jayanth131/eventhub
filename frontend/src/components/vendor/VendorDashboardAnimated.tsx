@@ -22,9 +22,11 @@ import BookingsDetails from './BookingsDetails';
 import AdvancePaymentDetails from './AdvancePaymentDetails';
 import TodaysEventsDetails from './TodaysEventsDetails';
 import ManualBooking from './ManualBooking';
+import VendorAvailability from './VendorAvailability';
 
 interface Booking {
   id: string;
+  profileId: string;  
   customerName: string;
   customerPhone: string;
   customerEmail: string;
@@ -52,6 +54,7 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [dashboardData, setDashboardData] = useState<any>("");
   const [loading, setLoading] = useState<boolean>(true);
+  const [profileId,setProfileId] = useState<string>("");
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [expandedBookingId, setExpandedBookingId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<'dashboard' | 'revenue' | 'bookings' | 'advance' | 'todaysEvents'>('dashboard');
@@ -68,7 +71,9 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
         ]);
         setDashboardData(summary);
         setBookings(bookingList);
+        setProfileId(bookingList[0].profileId);
         console.log('Fetched Dashboard Data:', summary);
+        console.log('Fetched profileid:',profileId);
         console.log('Fetched overall:', dashboardData.overallRevenue);
 
         // console.log("bookings:",bookings)
@@ -362,12 +367,7 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
               >
                 Bookings
               </TabsTrigger>
-              <TabsTrigger
-                value="analytics"
-                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[var(--royal-maroon)] data-[state=active]:to-[var(--royal-copper)] data-[state=active]:text-white"
-              >
-                Analytics
-              </TabsTrigger>
+             
               <TabsTrigger
                 value="availability"
                 className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[var(--royal-maroon)] data-[state=active]:to-[var(--royal-copper)] data-[state=active]:text-white"
@@ -400,89 +400,7 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {/* --- Stats Cards for Dashboard ---
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                    {[
-                      {
-                        title: 'Total Revenue',
-                        value: totalRevenue,
-                        icon: DollarSign,
-                        color: 'from-green-500 to-emerald-600',
-                        trend: '+12.5%',
-                        trendUp: true,
-                        prefix: '₹',
-                        onClick: () => setCurrentView('revenue')
-                      },
-                      {
-                        title: 'Total Bookings',
-                        value: bookings.length,
-                        icon: CalendarIcon,
-                        color: 'from-blue-500 to-indigo-600',
-                        trend: '+8 new',
-                        trendUp: true,
-                        onClick: () => setCurrentView('bookings')
-                      },
-                      {
-                        title: 'Advance Received',
-                        value: totalAdvanceReceived,
-                        icon: DollarSign,
-                        color: 'from-orange-500 to-amber-600',
-                        trend: `₹${pendingAmount.toLocaleString()} pending`,
-                        trendUp: false,
-                        prefix: '₹',
-                        onClick: () => setCurrentView('advance')
-                      },
-                      {
-                        title: "Today's Events",
-                        value: todaysBookings.length,
-                        icon: Users,
-                        color: 'from-purple-500 to-pink-600',
-                        trend: `${upcomingBookings.length} upcoming`,
-                        trendUp: true,
-                        onClick: () => setCurrentView('todaysEvents')
-                      }
-                    ].map((stat, index) => (
-                      <motion.div
-                        key={index}
-                        whileHover={{ scale: 1.03, y: -5 }}
-                        whileTap={{ scale: 0.98 }}
-                        transition={{ type: "spring", stiffness: 300 }}
-                      >
-                        <Card
-                          className="border-4 border-[var(--royal-gold)]/20 hover:border-[var(--royal-gold)] shadow-xl bg-white transition-all duration-300 overflow-hidden cursor-pointer"
-                          onClick={stat.onClick}
-                        >
-                          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br opacity-10 rounded-bl-full" style={{
-                            backgroundImage: `linear-gradient(135deg, var(--royal-gold), var(--royal-maroon))`
-                          }} />
-                          <CardContent className="p-6 relative">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-sm font-medium text-gray-600 mb-2">{stat.title}</p>
-                                <p className="text-3xl text-[var(--royal-maroon)]">
-                                  <AnimatedCounter value={stat.value} prefix={stat.prefix} />
-                                </p>
-                              </div>
-                              <div className={`p-4 bg-gradient-to-r ${stat.color} rounded-2xl shadow-lg`}>
-                                <stat.icon className="h-7 w-7 text-white" />
-                              </div>
-                            </div>
-                            <div className="flex items-center mt-3">
-                              {stat.trendUp ? (
-                                <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
-                              ) : (
-                                <Clock className="h-4 w-4 text-orange-500 mr-1" />
-                              )}
-                              <span className={`text-sm ${stat.trendUp ? 'text-green-600' : 'text-orange-600'}`}>
-                                {stat.trend}
-                              </span>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </motion.div>
-                    ))}
-                  </div> */}
-
+              
                   {/* --- Bookings List --- */}
                   <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-[var(--royal-gold)] scrollbar-track-[var(--royal-cream)]">
                     {bookings.map((booking) => {
@@ -506,7 +424,7 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
                               >
                                 <div className="space-y-2 flex-1">
                                   <div className="flex items-center space-x-3">
-                                    <h3 className="text-lg text-[var(--royal-maroon)]">{booking.customerName}</h3>
+                                    <h3 className="text-lg text-[var(--royal-maroon)]">{booking.eventHolderNames}</h3>
                                     <Badge className={getStatusColor(booking.status)}>
                                       {booking.status}
                                     </Badge>
@@ -524,11 +442,11 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
                                   <div className="flex items-center space-x-4 text-sm">
                                     <div className="flex items-center text-gray-600">
                                       <Phone className="h-4 w-4 mr-1" />
-                                      <span>{booking.customerPhone}</span>
+                                      <span>{booking.phone}</span>
                                     </div>
                                     <div className="flex items-center text-gray-600">
                                       <Mail className="h-4 w-4 mr-1" />
-                                      <span>{booking.customerEmail}</span>
+                                      <span>{booking.email}</span>
                                     </div>
                                   </div>
                                 </div>
@@ -575,246 +493,7 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
             </div>
           </TabsContent>
 
-          <TabsContent value="analytics" className="space-y-6">
-            {/* Stats Counters */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="border-4 border-[var(--royal-gold)]/30 shadow-xl bg-white">
-                <CardContent className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500">Total Revenue</p>
-                    <p className="text-3xl text-[var(--royal-maroon)]">
-                      <AnimatedCounter value={totalRevenue} prefix="₹" />
-                    </p>
-                  </div>
-                  <TrendingUp className="h-8 w-8 text-[var(--royal-maroon)]" />
-                </CardContent>
-              </Card>
-
-              <Card className="border-4 border-[var(--royal-gold)]/30 shadow-xl bg-white">
-                <CardContent className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500">Total Bookings</p>
-                    <p className="text-3xl text-[var(--royal-maroon)]">
-                      <AnimatedCounter value={bookings.length} />
-                    </p>
-                  </div>
-                  <CalendarIcon className="h-8 w-8 text-[var(--royal-maroon)]" />
-                </CardContent>
-              </Card>
-
-              <Card className="border-4 border-[var(--royal-gold)]/30 shadow-xl bg-white">
-                <CardContent className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500">Upcoming Events</p>
-                    <p className="text-3xl text-[var(--royal-maroon)]">
-                      <AnimatedCounter value={upcomingBookings.length} />
-                    </p>
-                  </div>
-                  <Clock className="h-8 w-8 text-[var(--royal-maroon)]" />
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Charts Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Revenue Trends */}
-              <Card className="border-4 border-[var(--royal-gold)]/30 shadow-xl bg-white">
-                <CardHeader>
-                  <CardTitle className="text-[var(--royal-maroon)]">Revenue Trends</CardTitle>
-                  <CardDescription>Monthly revenue performance</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <AreaChart data={[]}>
-                      <defs>
-                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="var(--royal-maroon)" stopOpacity={0.8} />
-                          <stop offset="95%" stopColor="var(--royal-gold)" stopOpacity={0.2} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="month" />
-                      <YAxis />
-                      <Tooltip />
-                      <Area type="monotone" dataKey="revenue" stroke="var(--royal-maroon)" fillOpacity={1} fill="url(#colorRevenue)" />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-
-              {/* Event Distribution */}
-              <Card className="border-4 border-[var(--royal-gold)]/30 shadow-xl bg-white">
-                <CardHeader>
-                  <CardTitle className="text-[var(--royal-maroon)]">Event Distribution</CardTitle>
-                  <CardDescription>Breakdown by event type</CardDescription>
-                </CardHeader>
-                <CardContent className="flex justify-center">
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={[]}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                        outerRadius={100}
-                        dataKey="value"
-                      >
-                        {[].map((entry: any, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="availability" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Calendar Selection */}
-              <Card className="border-4 border-[var(--royal-gold)]/30 shadow-xl bg-white">
-                <CardHeader>
-                  <CardTitle className="text-[var(--royal-maroon)] flex items-center">
-                    <CalendarIcon className="h-6 w-6 mr-2" />
-                    Select Date
-                  </CardTitle>
-                  <CardDescription>Choose a date to manage availability</CardDescription>
-                </CardHeader>
-                <CardContent className="flex justify-center">
-                  <div className="w-full flex justify-center">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={setSelectedDate}
-                      className="rounded-xl border-2 border-[var(--royal-gold)]/20"
-                    />
-                  </div>
-                </CardContent>
-                <div className="px-6 pb-6">
-                  <div className="flex items-center justify-around p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border-2 border-[var(--royal-gold)]/20">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-4 h-4 rounded-full bg-[var(--royal-maroon)]"></div>
-                      <span className="text-sm text-gray-600">Has Bookings</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-4 h-4 rounded-full border-2 border-gray-300"></div>
-                      <span className="text-sm text-gray-600">No Bookings</span>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-
-              {/* Time Slots */}
-              <Card className="border-4 border-[var(--royal-gold)]/30 shadow-xl bg-white">
-                <CardHeader>
-                  <CardTitle className="text-[var(--royal-maroon)] flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Clock className="h-6 w-6 mr-2" />
-                      Time Slots
-                    </div>
-                    {selectedDate && (
-                      <span className="text-sm text-gray-600">
-                        {selectedDate.toLocaleDateString('en-IN', {
-                          weekday: 'short',
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric'
-                        })}
-                      </span>
-                    )}
-                  </CardTitle>
-                  <CardDescription>Manage slots for the selected date</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {selectedDate ? (
-                    <>
-                      {currentDateSlots.length > 0 ? (
-                        currentDateSlots.map((slot) => (
-                          <div
-                            key={slot.id}
-                            className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all ${slot.available
-                              ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-300 hover:border-green-500'
-                              : 'bg-gradient-to-r from-red-50 to-rose-50 border-red-300 hover:border-red-500 opacity-75'
-                              }`}
-                          >
-                            <div className="flex items-center space-x-4">
-                              <Clock className={`h-5 w-5 ${slot.available ? 'text-green-600' : 'text-red-600'}`} />
-                              <div>
-                                <p className={`${slot.available ? 'text-green-900' : 'text-red-900'}`}>{slot.time}</p>
-                                <p className="text-sm text-gray-600">
-                                  {slot.available ? 'Available for booking' : 'Offline booking'}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center space-x-3">
-                              <Badge className={slot.available ? 'bg-green-500' : 'bg-red-500'}>
-                                {slot.available ? 'Available' : 'Booked'}
-                              </Badge>
-                              <Switch checked={!slot.available} onCheckedChange={() => {}} />
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-center py-8 space-y-4">
-                          <div className="flex justify-center">
-                            <CalendarIcon className="h-16 w-16 text-gray-300" />
-                          </div>
-                          <p className="text-gray-500">No time slots configured for this date</p>
-                          <div className="space-y-2">
-                            <p className="text-sm text-gray-600">Quick add common slots:</p>
-                            <div className="flex flex-wrap gap-2 justify-center">
-                              {['10:00 AM - 2:00 PM', '3:00 PM - 7:00 PM', '8:00 PM - 12:00 AM'].map((time) => (
-                                <Button
-                                  key={time}
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => addTimeSlot(time)}
-                                  className="border-2 border-[var(--royal-gold)]/20 hover:border-[var(--royal-gold)] hover:bg-[var(--royal-gold)]/10"
-                                >
-                                  Mark {time} as Booked
-                                </Button>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {currentDateSlots.length > 0 && (
-                        <div className="pt-4 border-t border-[var(--royal-gold)]/20">
-                          <p className="text-sm text-gray-600 mb-3">Add offline booking for other times:</p>
-                          <div className="flex flex-wrap gap-2">
-                            {['10:00 AM - 2:00 PM', '3:00 PM - 7:00 PM', '8:00 PM - 12:00 AM', '6:00 AM - 10:00 AM'].map((time) => {
-                              const slotExists = currentDateSlots.some(s => s.time === time);
-                              if (slotExists) return null;
-                              return (
-                                <Button
-                                  key={time}
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => addTimeSlot(time)}
-                                  className="border-2 border-[var(--royal-gold)]/20 hover:border-[var(--royal-gold)] hover:bg-[var(--royal-gold)]/10"
-                                >
-                                  + {time}
-                                </Button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div className="text-center py-12">
-                      <Sparkles className="h-12 w-12 text-[var(--royal-gold)] mx-auto mb-4" />
-                      <p className="text-gray-500">Select a date from the calendar to view and manage time slots</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
+          <VendorAvailability vendorId= {profileId} />
 
           <TabsContent value="profile" className="space-y-6">
             <Card className="border-4 border-[var(--royal-gold)]/30 shadow-xl bg-white">

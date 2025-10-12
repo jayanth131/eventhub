@@ -24,6 +24,10 @@ interface User {
   email: string;
   role: 'customer' | 'vendor';
 }
+interface Slot {
+  time: string;
+  price: number | string;
+}
 
 interface TimeSlot {
   time: string;
@@ -41,7 +45,7 @@ interface VendorProfile {
   totalCost: number; // The new total cost field
   imageUrls: string[];
   description: string;
-
+  standardSlots: Slot[];
   // DETAILS (Only present after detail fetch)
   advancePaymentAmount?: number; // Fetched via /details/card
   contactEmail?: string; // Fetched via /details/card
@@ -75,7 +79,10 @@ const locations = [
 
 // Helper function to extract price from vendor (using actual number field now)
 const getMinPrice = (vendor: VendorProfile): number => {
-  return vendor.totalCost || 0;
+  if (!vendor.standardSlots || vendor.standardSlots.length === 0) return 0;
+
+  const prices = vendor.standardSlots.map(slot => Number(slot.price));
+  return Math.max(...prices);
 };
 
 // Helper function to simulate distance for sorting (Remove once geo-data is implemented)
@@ -137,7 +144,7 @@ const CustomerBooking: React.FC<CustomerBookingProps> = ({
 
       // Ensure response.data exists and is an array before calling map
       const apiData = response;
-      console.log(response)
+      console.log("respnose",response)
 
       if (!Array.isArray(apiData)) {
         console.error("[ERROR] API did not return an array for vendors:", response);
@@ -154,16 +161,17 @@ const CustomerBooking: React.FC<CustomerBookingProps> = ({
         location: v.location,
         totalCost: v.totalCost,
         imageUrls: v.imageUrls || [],
-        email:v.email,
-        Phone:v.phone,
+        email: v.email,
+        Phone: v.phone,
         description: v.description,
+        standardSlots: v.standardSlots,
         // Ensure availability is undefined initially for the button logic
         availability: v.availability // Should be undefined/null from the fast endpoint
       }));
 
       setVendorsList(mappedVendors);
       console.log(`[LOG] Successfully loaded ${mappedVendors.length} vendors for list view.`);
-      console.log("mappedvendors",mappedVendors);
+      console.log("mappedvendors", mappedVendors);
 
     } catch (err: any) {
       setErrorList(`Failed to load vendors: ${err.message}`);
@@ -258,12 +266,13 @@ const CustomerBooking: React.FC<CustomerBookingProps> = ({
       vendorLocation: selectedVendor.location, // Redundant but useful for records
       // Transactional fields
       totalCost: selectedSlot.price, // CRITICAL: Price of the specific slot
-      email:selectedVendor.contactEmail,
+      email: selectedVendor.contactEmail,
       phone: selectedVendor.Phone,
+      advancePaid: selectedVendor.advancePaymentAmount, // CRITICAL: Must match backend record
       // Event Detail Fields
       eventDate: selectedDate.toISOString(), // CRITICAL: Uses ISO string for backend normalization
       eventTimeSlot: selectedSlot.time,
-
+      
       // Profile/Display Fields
       eventType: eventType === 'Other' ? customEventType : eventType,
       eventHolderNames: eventHolderNames, // The array of names
@@ -318,8 +327,10 @@ const CustomerBooking: React.FC<CustomerBookingProps> = ({
           vendor.location.toLowerCase().includes(searchQuery.toLowerCase());
 
         const vendorMinPrice = getMinPrice(vendor);
+        console.log("vendor min price", vendorMinPrice);
+        console.log(vendor.standardSlots)
         // FIX: Correctly check budget range bounds
-        const matchesBudget = vendorMinPrice >= budgetRange[0] && vendorMinPrice <= budgetRange[1];
+        const matchesBudget = vendorMinPrice >= budgetRange[1] && vendorMinPrice >= budgetRange[0];
 
         return matchesSearch && matchesBudget;
       })
@@ -337,6 +348,7 @@ const CustomerBooking: React.FC<CustomerBookingProps> = ({
           default:
             return b.averageRating - a.averageRating;
         }
+
       }),
     [vendorsList, searchQuery, budgetRange, sortBy]
   );

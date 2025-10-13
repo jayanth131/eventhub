@@ -102,3 +102,15 @@ export const blockManualSlotAPI = async (slotData) => {
     const response = await fetchAuthenticated(endpoint, 'POST', slotData);
     return response;
 };
+
+
+export const markBookingAsCompleted = async (bookingId) => {
+  const endpoint = `${BOOKING_API_URL}/complete/${bookingId}`;
+  const response = await fetchAuthenticated(endpoint, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  });
+  return response.data; // returns updated booking object
+};

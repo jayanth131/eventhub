@@ -95,3 +95,9 @@ export const fetchVendorDashboardSummary = async () => {
     const response = await fetchAuthenticated(endpoint);
     return response.data; // Returns the metrics object
 };
+
+export const markBookingAsCompleted = async (bookingId) => {
+  const endpoint = `${BOOKING_API_URL}/complete/${bookingId}`;
+  const response = await fetchAuthenticated(endpoint, 'PUT');
+  return response.data; // returns updated booking object
+};

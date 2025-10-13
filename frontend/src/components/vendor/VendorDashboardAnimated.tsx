@@ -26,7 +26,7 @@ import VendorAvailability from './VendorAvailability';
 
 interface Booking {
   id: string;
-  profileId: string;  
+  profileId: string;
   customerName: string;
   customerPhone: string;
   customerEmail: string;
@@ -34,6 +34,7 @@ interface Booking {
   time: string;
   amount: number;
   status: 'confirmed' | 'pending' | 'completed' | 'cancelled';
+  paymentStatus:'pending'| 'paid_advance'| 'paid_full'| 'failed'| 'manual'
   advancePaid: number;
 }
 
@@ -54,7 +55,7 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [dashboardData, setDashboardData] = useState<any>("");
   const [loading, setLoading] = useState<boolean>(true);
-  const [profileId,setProfileId] = useState<string>("");
+  const [profileId, setProfileId] = useState<string>("");
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [expandedBookingId, setExpandedBookingId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<'dashboard' | 'revenue' | 'bookings' | 'advance' | 'todaysEvents'>('dashboard');
@@ -72,9 +73,9 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
         setDashboardData(summary);
         setBookings(bookingList);
         setProfileId(bookingList[0].profileId);
-        console.log('Fetched Dashboard Data:', summary);
-        console.log('Fetched profileid:',profileId);
-        console.log('Fetched overall:', dashboardData.overallRevenue);
+        // console.log('Fetched Dashboard Data:', summary);
+        // console.log('Fetched profileid:', profileId);
+        console.log('Fetched overall:',bookings);
 
         // console.log("bookings:",bookings)
       } catch (error) {
@@ -367,7 +368,7 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
               >
                 Bookings
               </TabsTrigger>
-             
+
               <TabsTrigger
                 value="availability"
                 className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[var(--royal-maroon)] data-[state=active]:to-[var(--royal-copper)] data-[state=active]:text-white"
@@ -400,7 +401,7 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
                   </div>
                 </CardHeader>
                 <CardContent>
-              
+
                   {/* --- Bookings List --- */}
                   <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-[var(--royal-gold)] scrollbar-track-[var(--royal-cream)]">
                     {bookings.map((booking) => {
@@ -446,7 +447,8 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
                                     </div>
                                     <div className="flex items-center text-gray-600">
                                       <Mail className="h-4 w-4 mr-1" />
-                                      <span>{booking.email}</span>
+                                      <span>{booking.paymentStatus === "manual" ?  booking.email : booking.customerEmail}</span>
+                                      {/* {console.log(booking.paymentStatus)} */}
                                     </div>
                                   </div>
                                 </div>
@@ -493,7 +495,7 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
             </div>
           </TabsContent>
 
-          <VendorAvailability vendorId= {profileId} />
+          <VendorAvailability vendorId={profileId} />
 
           <TabsContent value="profile" className="space-y-6">
             <Card className="border-4 border-[var(--royal-gold)]/30 shadow-xl bg-white">

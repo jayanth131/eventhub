@@ -13,7 +13,7 @@ import {
 // import { ImageWithFallback } from '../figma/ImageWithFallback'; 
 
 // --- BACKEND SERVICE IMPORTS ---
-import { fetchCustomerBookings } from '../services/vendorService';
+import { fetchCustomerBookings,markBookingAsCompleted } from '../services/vendorService';
 // -----------------------------
 
 
@@ -107,13 +107,14 @@ export default function MyBookings({ user, onNavigateHome, onLogout }: MyBooking
         total: b.total,
         paid: b.paid,
         balance: b.balance,
-        Phone: b.vendorPhone,
-      
+        Phone: b.phone,
+        vendorEmail: b.email,
+
 
       }));
 
       setBookings(mappedData);
-      console.log("mapped data:", mappedData)
+      console.log("mapped data: my customer bookings", mappedData)
     } catch (err: any) {
       console.error("Failed to load customer bookings:", err);
       setError("Unable to load booking history. Please check your network or token.");
@@ -143,9 +144,24 @@ export default function MyBookings({ user, onNavigateHome, onLogout }: MyBooking
   const completedCount = bookings.filter(b => b.status === 'completed').length;
   const cancelledCount = bookings.filter(b => b.status === 'cancelled').length; // Added cancelled count
 
-  const totalSpent = bookings
-    .filter(b => b.status !== 'cancelled') // Only count non-cancelled bookings towards total spent
-    .reduce((sum, b) => sum + b.paid, 0); // Sum of advance paid
+    const handlePayRemaining = async (bookingId) => {
+  try {
+    const updatedBooking = await markBookingAsCompleted(bookingId);
+    console.log('✅ Booking marked as completed:', updatedBooking);
+    // show toast or refresh dashboard
+  } catch (err) {
+    console.error('❌ Error marking booking as completed:', err);
+    // show error toast
+  }
+};
+  const totalSpent = bookings.reduce((sum, b) => {
+  if (b.status === 'completed') {
+    return sum + b.total;       // add total for completed bookings
+  } else {
+    return sum + b.paid;        // add paid for non-completed bookings
+  }
+}, 0);
+// Sum of advance paid
 
   const getStatusConfig = (status: string) => {
     switch (status) {
@@ -174,6 +190,8 @@ export default function MyBookings({ user, onNavigateHome, onLogout }: MyBooking
           text: 'Unknown'
         };
     }
+
+
   };
 
   return (
@@ -500,11 +518,11 @@ export default function MyBookings({ user, onNavigateHome, onLogout }: MyBooking
                                           </div>
                                           {booking.paid < booking.total && (
                                             <div className="text-right">
-                                            <p className="text-sm text-gray-600">
-                                              balance: <span className="text-2xl text-[var(--royal-maroon)] font-semibold">₹{booking.balance}</span>
-                                            </p>
-                                            {/*                                             <p className="text-lg text-green-600">₹{booking.paid.toLocaleString()}</p> */}
-                                          </div>
+                                              <p className="text-sm text-gray-600">
+                                                balance: <span className="text-2xl text-[var(--royal-maroon)] font-semibold">₹{booking.balance}</span>
+                                              </p>
+                                              {/*                                             <p className="text-lg text-green-600">₹{booking.paid.toLocaleString()}</p> */}
+                                            </div>
                                           )}
                                         </div>
 
@@ -520,14 +538,17 @@ export default function MyBookings({ user, onNavigateHome, onLogout }: MyBooking
                                           </motion.div>
                                           {booking.status === 'upcoming' && (
                                             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                                              <Button
-                                                variant="outline"
-                                                className="w-full border-2 border-[var(--royal-gold)] text-[var(--royal-maroon)] hover:bg-[var(--royal-gold)] hover:text-white"
-                                                size="sm"
-                                              >
-                                                <MessageSquare className="h-4 w-4 mr-2" />
-                                                Contact Vendor
-                                              </Button>
+                                              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                                                <Button
+                                                  className="w-full bg-gradient-to-r from-[var(--royal-maroon)] to-[var(--royal-copper)] hover:from-[var(--royal-copper)] hover:to-[var(--royal-maroon)] text-white border-2 border-[var(--royal-gold)]"
+                                                  size="sm" onClick={() => handlePayRemaining(booking.id)}
+                                                >
+                                                  {/* <Download className="h-4 w-4 mr-2" />
+                                               */}
+                                                  Pay Remaining Balance
+
+                                                </Button>
+                                              </motion.div>
                                             </motion.div>
                                           )}
                                           {booking.status === 'completed' && !booking.rating && (
@@ -538,7 +559,7 @@ export default function MyBookings({ user, onNavigateHome, onLogout }: MyBooking
                                                 size="sm"
                                               >
                                                 <Star className="h-4 w-4 mr-2" />
-                                                Leave Review
+                                                Paid
                                               </Button>
                                             </motion.div>
                                           )}

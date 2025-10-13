@@ -109,6 +109,7 @@ exports.createBooking = async (req, res, next) => {
         if (userRole === 'vendor') {
             // Offline vendor booking → manual
             paymentStatus = 'manual';
+
             bookingStatus = 'confirmed';
             if (!advanceAmountPaid) advanceAmountPaid = 0;
         }
@@ -230,6 +231,7 @@ exports.getCustomerBookings = async (req, res, next) => {
             status: booking.bookingStatus,
             phone: booking.phone,
             email: booking.email,    
+            paymentStatus:booking.paymentStatus,
 
             ...(req.user.role === 'customer'
                 ? {
@@ -250,6 +252,7 @@ exports.getCustomerBookings = async (req, res, next) => {
         }));
 
         console.log("Transformed bookings:", transformed);
+        console.log("customer email:",bookings);
         // console.log("fetching customer bookings ended")
 
         res.status(200).json({
@@ -268,3 +271,42 @@ exports.getCustomerBookings = async (req, res, next) => {
 };
 
 
+
+
+// ✅ Pay remaining balance and mark booking as completed
+exports.markBookingAsCompleted = async (req, res, next) => {
+  try {
+    const { bookingId } = req.params;
+
+    // ✅ Validate bookingId
+    if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+      return res.status(400).json({ message: 'Invalid booking ID' });
+    }
+
+    // 🛠 Update booking status
+    const updatedBooking = await Booking.findByIdAndUpdate(
+      bookingId,
+      {
+        $set: {
+          bookingStatus: 'completed',
+          paymentStatus: 'paid', // optional if you're tracking payment
+          completedAt: new Date(), // optional: timestamp when completed
+          remainingBalance:0
+        }
+      },
+      { new: true } // returns the updated document
+    );
+
+    if (!updatedBooking) {
+      return res.status(404).json({ message: 'Booking not found' });
+    }
+
+    return res.status(200).json({
+      message: 'Booking marked as completed successfully ✅',
+      booking: updatedBooking
+    });
+  } catch (err) {
+    console.error('❌ Error completing booking:', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};

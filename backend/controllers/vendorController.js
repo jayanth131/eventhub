@@ -203,7 +203,7 @@ exports.getDashboardSummary = async (req, res, next) => {
         // --- 1. Fetch Today's & Upcoming Bookings ---
         const upcomingBookings = await Booking.find({
             vendor: vendorId,
-            bookingStatus: { $in: ['confirmed', 'pending_vendor'] }, // Confirmed or pending acceptance
+            bookingStatus: { $in: ['completed', 'pending_vendor'] }, // Confirmed or pending acceptance
             eventDate: { $gte: today }
         })
             .select('eventDate eventTimeSlot totalCost remainingBalance customer')
@@ -218,37 +218,69 @@ exports.getDashboardSummary = async (req, res, next) => {
         );
 
         // --- 2. Calculate Revenue Metrics (Aggregation) ---
-        const revenueSummary = await Booking.aggregate([
-            {
-                $match: {
-                    vendor: new mongoose.Types.ObjectId(vendorId),
-                    bookingStatus: { $in: ['confirmed', 'completed'] }
-                }
-            },
-            {
-                $group: {
-                    _id: null,
-                    totalRevenue: { $sum: '$totalCost' },
-                    totalAdvance: { $sum: '$advanceAmountPaid' },
-                    totalCompleted: {
-                        $sum: {
-                            $cond: [{ $eq: ['$bookingStatus', 'completed'] }, '$totalCost', 0]
-                        }
-                    },
-                    totalCanceled: { 
-                        $sum: { 
-                            $cond: [
-                                { $in: ['$bookingStatus', ['canceled_customer', 'canceled_vendor']] }, 
-                                1, 
-                                0
-                            ] 
-                        } 
-                    },
-                    // ✅ New: Count total confirmed + completed bookings
-                    totalBookingsCount: { $sum: 1 }
-                }
-            }
-        ]);
+const revenueSummary = await Booking.aggregate([
+  {
+    $match: {
+      vendor: new mongoose.Types.ObjectId(vendorId),
+      bookingStatus: { 
+        $in: ['completed', 'pending', 'confirmed', 'canceled_customer', 'canceled_vendor'] 
+      }
+    }
+  },
+  {
+    $group: {
+      _id: null,
+
+      // 💰 Total revenue only from completed bookings
+      totalRevenue: {
+        $sum: {
+          $cond: [
+            { $eq: ['$bookingStatus', 'completed'] },
+            '$totalCost',
+            0
+          ]
+        }
+      },
+
+      // 💸 Total advance only from NON-completed bookings
+      totalAdvance: {
+        $sum: {
+          $cond: [
+            { $eq: ['$bookingStatus', 'completed'] },
+            0,
+            '$advanceAmountPaid'
+          ]
+        }
+      },
+
+      // ✅ Total completed revenue
+      totalCompleted: {
+        $sum: {
+          $cond: [
+            { $eq: ['$bookingStatus', 'completed'] },
+            '$totalCost',
+            0
+          ]
+        }
+      },
+
+      // ❌ Total canceled bookings count
+      totalCanceled: {
+        $sum: {
+          $cond: [
+            { $in: ['$bookingStatus', ['canceled_customer', 'canceled_vendor']] },
+            1,
+            0
+          ]
+        }
+      },
+
+      // 🧾 Total number of bookings in the period
+      totalBookingsCount: { $sum: 1 }
+    }
+  }
+]);
+
 
         const revenueData = revenueSummary[0] || {};
 

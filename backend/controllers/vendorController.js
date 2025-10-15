@@ -335,13 +335,13 @@ exports.cancelBookingVendor = async (req, res, next) => {
             normalizeDate(item.date).getTime() === normalizeDate(booking.eventDate).getTime()
         );
 
-        // if (dayEntry) {
-        //     const slot = dayEntry.slots.find(s => s.time === booking.eventTimeSlot);
-        //     if (slot) {
-        //         slot.status = 'available'; // Slot is freed up
-        //         await vendor.save({ session });
-        //     }
-        // }
+        if (dayEntry) {
+            const slot = dayEntry.slots.find(s => s.time === booking.eventTimeSlot);
+            if (slot) {
+                slot.status = 'available'; // Slot is freed up
+                await vendor.save({ session });
+            }
+        }
 
         await session.commitTransaction();
         session.endSession();

@@ -1,9 +1,12 @@
+
 import { useEffect, useState } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { fetchVendorDetailsForCard } from "../services/vendorsummaryservices.js";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+
 
 interface Slot {
   time: string;
@@ -57,6 +60,8 @@ export default function VendorAvailability({ vendorId }: VendorAvailabilityProps
   };
 
   return (
+              <TabsContent value="availability" className="space-y-6">
+
     <Card className="w-full shadow-md">
       <CardHeader>
         <CardTitle>Availability</CardTitle>
@@ -94,5 +99,6 @@ export default function VendorAvailability({ vendorId }: VendorAvailabilityProps
         </div>
       </CardContent>
     </Card>
+              </TabsContent>
   );
 }

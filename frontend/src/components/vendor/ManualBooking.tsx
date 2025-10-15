@@ -31,13 +31,10 @@ interface ManualBookingProps {
 
 const timeSlots = [
   '9:00 AM - 12:00 PM',
-  '10:00 AM - 2:00 PM',
-  '12:00 PM - 4:00 PM',
-  '3:00 PM - 7:00 PM',
-  '5:00 PM - 9:00 PM',
-  '6:00 PM - 10:00 PM',
-  '7:00 PM - 11:00 PM',
-  '8:00 PM - 12:00 AM',
+  "12:00pm to 15:00pm",
+  "15:00pm to 18:00pm",
+  'Full day',
+  'Half day (9:00am to 16:00pm)',
 ];
 
 export default function ManualBooking({ vendorId, vendorName, vendorLocation, onSuccess }: ManualBookingProps) {
@@ -107,7 +104,7 @@ export default function ManualBooking({ vendorId, vendorName, vendorLocation, on
         
         customerPhone: formData.customerPhone,
         customerEmail: formData.customerEmail || '',
-        eventDate: format(date!, 'yyyy-MM-dd'), // normalized date string
+        eventDate: date.toISOString(), // normalized date string
         eventTimeSlot: formData.time,
         eventHolderNames: formData.customerName,
         eventType: formData.eventType,

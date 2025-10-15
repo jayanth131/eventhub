@@ -297,6 +297,7 @@ exports.markBookingAsCompleted = async (req, res, next) => {
       { new: true } // returns the updated document
     );
 
+   
     if (!updatedBooking) {
       return res.status(404).json({ message: 'Booking not found' });
     }

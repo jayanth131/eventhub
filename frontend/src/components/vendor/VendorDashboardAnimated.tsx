@@ -16,7 +16,7 @@ import {
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 // import ManualBooking from './ManualBooking';
 import { toast } from 'sonner@2.0.3';
-import { fetchVendorDashboardSummary, fetchCustomerBookings, submitBooking } from '../services/vendorsummaryservices.js';
+import { fetchVendorDashboardSummary, fetchCustomerBookings, submitBooking, cancelBookingAPI } from '../services/vendorsummaryservices.js';
 import RevenueDetails from './RevenueDetails';
 import BookingsDetails from './BookingsDetails';
 import AdvancePaymentDetails from './AdvancePaymentDetails';
@@ -34,7 +34,7 @@ interface Booking {
   time: string;
   amount: number;
   status: 'confirmed' | 'pending' | 'completed' | 'cancelled';
-  paymentStatus:'pending'| 'paid_advance'| 'paid_full'| 'failed'| 'manual'
+  paymentStatus: 'pending' | 'paid_advance' | 'paid_full' | 'failed' | 'manual'
   advancePaid: number;
 }
 
@@ -75,7 +75,7 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
         setProfileId(bookingList[0].profileId);
         // console.log('Fetched Dashboard Data:', summary);
         // console.log('Fetched profileid:', profileId);
-        console.log('Fetched overall:',bookings);
+        console.log('Fetched overall:', bookings);
 
         // console.log("bookings:",bookings)
       } catch (error) {
@@ -117,10 +117,18 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
       const cancelledBooking = bookings.find(b => b.id === bookingId);
       if (!cancelledBooking) return;
 
-      // TODO: integrate cancel API call here if backend supports
+      // ✅ Call the cancel booking API
+      const response = await cancelBookingAPI(bookingId);
+
+      if (!response || response.error) {
+        throw new Error(response?.message || 'Failed to cancel booking');
+      }
+
+      // ✅ Update the bookings state locally after successful cancellation
 
       setBookings(prev => prev.filter(b => b.id !== bookingId));
 
+      // ✅ Mark the corresponding time slot as available
       setTimeSlots(prev =>
         prev.map(slot =>
           slot.date === cancelledBooking.date && slot.time === cancelledBooking.time
@@ -129,16 +137,19 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
         )
       );
 
+      // ✅ Show success toast
       toast.success('Booking Cancelled', {
         description: `Booking ${bookingId} for ${cancelledBooking.customerName} has been cancelled. Time slot is now available.`,
       });
 
+      // ✅ Collapse expanded booking card
       setExpandedBookingId(null);
     } catch (error) {
       console.error('Error cancelling booking:', error);
       toast.error('Failed to cancel booking');
     }
   };
+
 
   // ✅ Toggle booking expansion
   const toggleBookingExpansion = (bookingId: string) => {
@@ -250,7 +261,7 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
                   variant="outline"
                   size="sm"
                   onClick={onNavigateToManageServices}
-                  className="bg-white/10 text-white border-2 border-[var(--royal-gold)] hover:bg-[var(--royal-gold)]"
+                  className="bg-white/10 text-black border-2 border-[var(--royal-gold)] hover:bg-[var(--royal-gold)]"
                 >
                   <Settings className="h-4 w-4 mr-2" />
                   Manage Services
@@ -273,7 +284,7 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
       {/* Main Dashboard */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
         {/* Manual Booking */}
-        <ManualBooking onAddBooking={handleAddBooking} />
+        {/* <ManualBooking onAddBooking={handleAddBooking} /> */}
 
         {/* Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 mt-6">
@@ -286,7 +297,7 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
               trend: '+12.5%',
               trendUp: true,
               prefix: '₹',
-              onClick: () => setCurrentView('revenue')
+              // onClick: () => setCurrentView('revenue')
             },
             {
               title: 'Total Bookings',
@@ -295,7 +306,7 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
               color: 'from-blue-500 to-indigo-600',
               // trend: `+${upcomingBookings.length} upcoming`,
               // trendUp: true,
-              onClick: () => setCurrentView('bookings')
+              // onClick: () => setCurrentView('bookings')
             },
             {
               title: 'Advance Received',
@@ -305,7 +316,7 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
               // trend: `₹${pendingAmount.toLocaleString()} pending`,
               // trendUp: false,
               // prefix: '₹',
-              onClick: () => setCurrentView('advance')
+              // onClick: () => setCurrentView('advance')
             },
             {
               title: "Today's Events",
@@ -314,7 +325,7 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
               color: 'from-purple-500 to-pink-600',
               trend: `${dashboardData.upcomingEventsCount} upcoming`,
               trendUp: true,
-              onClick: () => setCurrentView('todaysEvents')
+              // onClick: () => setCurrentView('todaysEvents')
             }
           ].map((stat, index) => (
             <motion.div
@@ -447,7 +458,7 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
                                     </div>
                                     <div className="flex items-center text-gray-600">
                                       <Mail className="h-4 w-4 mr-1" />
-                                      <span>{booking.paymentStatus === "manual" ?  booking.email : booking.customerEmail}</span>
+                                      <span>{booking.paymentStatus === "manual" ? booking.email : booking.customerEmail}</span>
                                       {/* {console.log(booking.paymentStatus)} */}
                                     </div>
                                   </div>
@@ -476,14 +487,25 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
                                     animate={{ height: 'auto', opacity: 1 }}
                                     exit={{ height: 0, opacity: 0 }}
                                     transition={{ duration: 0.3 }}
-                                    className="overflow-hidden"
+                                    className="overflow-hidden pt-4"
                                   >
-                                    {/* Detailed Sections here */}
-                                    {/* Payment / Booking Info / Customer Contact / Action Buttons */}
-                                    {/* Same structure as your previous expanded content */}
+                                    {/* --- Expanded Details Section --- */}
+                                    {/* <div className="flex items-center justify-between border-t pt-4"> */}
+
+
+                                    {/* --- Cancel Booking Button --- */}
+                                    <button
+                                      onClick={() => handleCancelBooking(booking.id)}
+                                      className="bg-destructive text-destructive-foreground px-4 py-2 rounded-lg hover:opacity-90 transition-all duration-300"
+                                    >
+                                      Cancel Booking
+                                    </button>
+
+                                    {/* </div> */}
                                   </motion.div>
                                 )}
                               </AnimatePresence>
+
                             </CardContent>
                           </Card>
                         </motion.div>
@@ -501,10 +523,12 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
             <Card className="border-4 border-[var(--royal-gold)]/30 shadow-xl bg-white">
               <CardHeader>
                 <CardTitle className="text-[var(--royal-maroon)] flex items-center">
-                  <Crown className="h-6 w-6 mr-2 text-[var(--royal-gold)]" />
+                  {/* <Crown className="h-6 w-6 mr-2 text-[var(--royal-gold)]" />
+                   */}
+                  {/* <img src={bookings.} alt="" /> */}
                   Royal Vendor Profile
                 </CardTitle>
-                <CardDescription>Your premium wedding service details</CardDescription>
+                <CardDescription>Your premium Event service details</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Avatar & Info */}
@@ -542,18 +566,18 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
                       <AnimatedCounter value={8} />
                     </p>
                   </div>
-                  <div>
+                  {/* <div>
                     <p className="text-sm text-gray-600 mb-1">Customer Satisfaction</p>
                     <p className="text-2xl text-[var(--royal-maroon)]">
                       <AnimatedCounter value={98} suffix="%" />
                     </p>
-                  </div>
-                  <div>
+                  </div> */}
+                  {/* <div>
                     <p className="text-sm text-gray-600 mb-1">Repeat Customers</p>
                     <p className="text-2xl text-[var(--royal-maroon)]">
                       <AnimatedCounter value={45} suffix="%" />
                     </p>
-                  </div>
+                  </div> */}
                 </div>
               </CardContent>
             </Card>

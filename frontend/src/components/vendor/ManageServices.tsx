@@ -16,8 +16,9 @@ import {
 } from 'lucide-react';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
 import { fetchVendorDetailsForCard } from '../services/vendorsummaryservices.js';
+import{updateVendorActiveStatusAPI } from '../services/vendorService.js';
 import VendorDashboard from './VendorDashboardAnimated.js';
-import { useNavigate } from "react-router-dom";
+// import { useNavigate } from "react-router-dom";
 
 
 
@@ -119,6 +120,7 @@ export default function ManageServices({ user, onBack, }: ManageServicesProps) {
           isActive: data.ActiveStatus
         }
       ];
+      console.log("Fetched Data:", data.ActiveStatus);
       console.log("Mapped Services:", mappedServices);
       setServices(mappedServices);
     } catch (err) {
@@ -147,16 +149,49 @@ export default function ManageServices({ user, onBack, }: ManageServicesProps) {
       return service;
     }));
   };
-const toggleServiceActive = (id: string) => {
-  console.log("Toggling active status for service ID:", services);
-  setServices(services.map(service => 
-    service.id === id 
-      ? { 
-          ...service, 
-          isActive: !service.isActive
-        } 
-      : service
-  ));
+// const toggleServiceActive = (id: string) => {
+//   setServices(services.map(service => 
+//     service.id === id 
+//       ? { 
+//           ...service, 
+//           isActive: !service.isActive
+//         } 
+//       : service
+//   ));
+//     console.log("Toggled active status for service ID:", services[0].isActive);
+//     console.log("Toggling active status for service ID:", services);
+
+// };
+
+const toggleServiceActive = async (id: string) => {
+  // Find current service
+  const currentService = services.find(service => service.id === id);
+  const newStatus = !currentService?.isActive;
+
+  // Optimistic UI update
+  setServices(prevServices =>
+    prevServices.map(service =>
+      service.id === id
+        ? { ...service, isActive: newStatus }
+        : service
+    )
+  );
+
+  try {
+    // Update backend
+    await updateVendorActiveStatusAPI(id, newStatus);
+    console.log(`✅ Service ID ${id} ActiveStatus updated to ${newStatus}`);
+  } catch (err) {
+    console.error("❌ Failed to update ActiveStatus:", err.message);
+    // Rollback on failure
+    setServices(prevServices =>
+      prevServices.map(service =>
+        service.id === id
+          ? { ...service, isActive: !currentService?.isActive }
+          : service
+      )
+    );
+  }
 };
 
   return (
@@ -294,6 +329,7 @@ const toggleServiceActive = (id: string) => {
                           checked={service.isActive}
                           onCheckedChange={() => toggleServiceActive(service.id)}
                         />
+                        {console.log("Service ID:", service.id, "isActive:", service.isActive)}
                         <span className="text-xs text-gray-600">Active</span>
                       </div>
                     </CardContent>

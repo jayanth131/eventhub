@@ -101,3 +101,10 @@ export const markBookingAsCompleted = async (bookingId) => {
   const response = await fetchAuthenticated(endpoint, 'PUT');
   return response.data; // returns updated booking object
 };
+
+export const updateVendorActiveStatusAPI = async (vendorId, newStatus) => {
+    const endpoint = `${VENDOR_API_URL}/${vendorId}/active-status`;
+    const body = { ActiveStatus: newStatus };
+    const response = await fetchAuthenticated(endpoint, 'PUT', body);
+    return response; // returns updated vendor object
+};

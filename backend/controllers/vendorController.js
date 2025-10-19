@@ -432,3 +432,26 @@ exports.blockManualSlot = async (req, res, next) => {
         res.status(500).json({ success: false, message: err.message });
     }
 };
+// ✅ Controller to update ActiveStatus
+exports.updateVendorActiveStatus = async (req, res) => {
+  const { vendorId } = req.params;
+  const { ActiveStatus } = req.body;
+
+  try {
+    const vendor = await VendorProfile.findById(vendorId);
+    if (!vendor) {
+      return res.status(404).json({ message: 'Vendor not found' });
+    }
+
+    vendor.ActiveStatus = ActiveStatus;
+    await vendor.save();
+
+    res.status(200).json({
+      message: `Vendor ActiveStatus updated to ${ActiveStatus}`,
+      vendor
+    });
+  } catch (error) {
+    console.error('Error updating ActiveStatus:', error);
+    res.status(500).json({ message: 'Server error', error });
+  }
+};

@@ -114,3 +114,4 @@ export const markBookingAsCompleted = async (bookingId) => {
   });
   return response.data; // returns updated booking object
 };
+

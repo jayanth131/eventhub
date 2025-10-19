@@ -38,7 +38,7 @@ exports.getMyProfile = async (req, res) => {
         res.status(200).json({
             success: true,
             data: {
-                id: user._id,
+                id: user.profileId,
                 role: user.role,
                 email: user.email,
                 // The accurate display name

@@ -30,7 +30,7 @@ interface ManualBookingProps {
 }
 
 const timeSlots = [
-  '9:00 AM - 12:00 PM',
+  '9:00am to 12:00pm',
   "12:00pm to 15:00pm",
   "15:00pm to 18:00pm",
   'Full day',
@@ -141,6 +141,7 @@ export default function ManualBooking({ vendorId, vendorName, vendorLocation, on
   };
 
   return (
+    
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button

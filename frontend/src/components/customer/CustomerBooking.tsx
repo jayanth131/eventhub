@@ -144,7 +144,7 @@ const CustomerBooking: React.FC<CustomerBookingProps> = ({
 
       // Ensure response.data exists and is an array before calling map
       const apiData = response;
-      console.log("respnose",response)
+      console.log("respnose", response)
 
       if (!Array.isArray(apiData)) {
         console.error("[ERROR] API did not return an array for vendors:", response);
@@ -272,7 +272,7 @@ const CustomerBooking: React.FC<CustomerBookingProps> = ({
       // Event Detail Fields
       eventDate: selectedDate.toISOString(), // CRITICAL: Uses ISO string for backend normalization
       eventTimeSlot: selectedSlot.time,
-      
+
       // Profile/Display Fields
       eventType: eventType === 'Other' ? customEventType : eventType,
       eventHolderNames: eventHolderNames, // The array of names
@@ -608,9 +608,9 @@ const CustomerBooking: React.FC<CustomerBookingProps> = ({
                           <p className="text-[var(--royal-gold)]">{vendor.category}</p>
                           <div className="flex items-center space-x-4 mt-3">
                             <div className="flex items-center space-x-1">
-                              <Star className="h-5 w-5 text-[var(--royal-gold)] fill-current" />
-                              <span>{vendor.averageRating.toFixed(1)}</span>
-                              <span className="text-sm text-gray-500">({vendor.reviewCount} reviews)</span>
+                              {/* <Star className="h-5 w-5 text-[var(--royal-gold)] fill-current" /> */}
+                              {/* <span>{vendor.averageRating.toFixed(1)}</span> */}
+                              {/* <span className="text-sm text-gray-500">({vendor.reviewCount} reviews)</span> */}
                             </div>
                             <div className="flex items-center space-x-1">
                               <MapPin className="h-4 w-4 text-gray-400" />
@@ -634,7 +634,7 @@ const CustomerBooking: React.FC<CustomerBookingProps> = ({
                             <div className="flex items-center space-x-4 text-sm">
                               <div className="flex items-center space-x-1 text-gray-600">
                                 <Phone className="h-4 w-4" />
-                                <span>{'Contact on booking'}</span>
+                                <span>{vendor.phone}</span>
                               </div>
                               <div className="flex items-center space-x-1 text-gray-600">
                                 <Mail className="h-4 w-4" />
@@ -650,28 +650,49 @@ const CustomerBooking: React.FC<CustomerBookingProps> = ({
                               Available Slots
                             </h4>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                              {vendor.availability.map((slot, index) => (
-                                <Button
-                                  key={index}
-                                  variant={slot.status === 'available' ? "default" : "outline"}
-                                  onClick={() => {
-                                    // Create a mock TimeSlot object based on API data for the dialog
-                                    const mockSlot: LocalTimeSlot = { id: `${index}`, time: slot.time, available: slot.status === 'available', price: slot.price };
-                                    handleBookSlot(vendor, mockSlot);
-                                  }}
-                                  disabled={slot.status !== 'available'}
-                                  className={`w-full py-4 px-4 flex flex-col items-center justify-center min-h-[80px] transition-all duration-200 ${slot.status === 'available'
-                                    ? 'bg-gradient-to-r from-[var(--royal-maroon)] to-[var(--royal-copper)] hover:from-[var(--royal-copper)] hover:to-[var(--royal-maroon)] text-white border-2 border-[var(--royal-gold)] hover:scale-105 hover:shadow-lg'
-                                    : 'opacity-60 cursor-not-allowed bg-gray-100 border-2 border-gray-200 text-gray-500'
-                                    }`}
-                                >
-                                  <span className="text-xs font-medium mb-1 ">{slot.time}</span>
-                                  <span className="text-lg font-semibold">₹{slot.price.toLocaleString()}</span>
-                                  {slot.status !== 'available' && (
-                                    <span className="text-xs text-red-500 mt-1 font-medium bg-red-50 px-2 py-1 rounded-full">Already Booked</span>
-                                  )}
-                                </Button>
-                              ))}
+                              {(() => {
+                                // Check if a full day slot exists
+                                const isFullDayBooked = vendor.availability.some(
+                                  (s) => s.time.toLowerCase() === 'full day' && s.status !== 'available'
+                                );
+
+                                return vendor.availability.map((slot, index) => {
+                                  // Mark slot as booked if it's full day booked OR its status is not available
+                                  const isBooked = isFullDayBooked || slot.status !== 'available';
+
+                                  return (
+                                    <Button
+                                      key={index}
+                                      variant={!isBooked ? "default" : "outline"}
+                                      onClick={() => {
+                                        if (!isBooked) {
+                                          const mockSlot: LocalTimeSlot = {
+                                            id: `${index}`,
+                                            time: slot.time,
+                                            available: !isBooked,
+                                            price: slot.price
+                                          };
+                                          handleBookSlot(vendor, mockSlot);
+                                        }
+                                      }}
+                                      disabled={isBooked}
+                                      className={`w-full py-4 px-4 flex flex-col items-center justify-center min-h-[80px] transition-all duration-200 ${!isBooked
+                                          ? 'bg-gradient-to-r from-[var(--royal-maroon)] to-[var(--royal-copper)] hover:from-[var(--royal-copper)] hover:to-[var(--royal-maroon)] text-white border-2 border-[var(--royal-gold)] hover:scale-105 hover:shadow-lg'
+                                          : 'opacity-60 cursor-not-allowed bg-gray-100 border-2 border-gray-200 text-gray-500'
+                                        }`}
+                                    >
+                                      <span className="text-xs font-medium mb-1">{slot.time}</span>
+                                      <span className="text-lg font-semibold">₹{slot.price.toLocaleString()}</span>
+                                      {isBooked && (
+                                        <span className="text-xs text-red-500 mt-1 font-medium bg-red-50 px-2 py-1 rounded-full">
+                                          Already Booked
+                                        </span>
+                                      )}
+                                    </Button>
+                                  );
+                                });
+                              })()}
+
                             </div>
                           </div>
                         </>

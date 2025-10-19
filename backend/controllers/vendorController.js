@@ -147,9 +147,11 @@ exports.getVendorBookingCardDetails = async (req, res, next) => {
 
             // Contact Info
             contactEmail: vendor.email,
-            phone:vendor.phone
+            phone:vendor.phone,
+            ActiveStatus:vendor.ActiveStatus
         };
-        // console.log("carddata",cardData);
+        console.log("carddata",cardData);
+        console.log("data",vendor)
         res.status(200).json({ success: true, data: cardData });
         // console.log(cardData);
 

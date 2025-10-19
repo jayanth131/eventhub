@@ -155,7 +155,7 @@ exports.createBooking = async (req, res, next) => {
 
         await session.commitTransaction();
         session.endSession();
-        console.log('New Booking Created:', newBooking[0]);
+        // console.log('New Booking Created:', newBooking[0]);
 
         res.status(201).json({
             success: true,
@@ -251,8 +251,8 @@ exports.getCustomerBookings = async (req, res, next) => {
             eventType: booking.eventType
         }));
 
-        console.log("Transformed bookings:", transformed);
-        console.log("customer email:",bookings);
+        // console.log("Transformed bookings:", transformed);
+        // console.log("customer email:",bookings);
         // console.log("fetching customer bookings ended")
 
         res.status(200).json({
@@ -291,7 +291,8 @@ exports.markBookingAsCompleted = async (req, res, next) => {
           bookingStatus: 'completed',
           paymentStatus: 'paid', // optional if you're tracking payment
           completedAt: new Date(), // optional: timestamp when completed
-          remainingBalance:0
+          remainingBalance:0,
+          
         }
       },
       { new: true } // returns the updated document

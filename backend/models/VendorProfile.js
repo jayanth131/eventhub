@@ -40,6 +40,10 @@ const VendorProfileSchema = new mongoose.Schema({
         type: [StandardSlotSchema],
         default: DEFAULT_STANDARD_SLOTS // Assign the predefined array as the default value
     },
+    ActiveStatus: { 
+        type: Boolean, 
+        default: true 
+    },
     // KEPT: Fixed advance payment amount (number)
     advancePaymentAmount: { 
         type: Number, 

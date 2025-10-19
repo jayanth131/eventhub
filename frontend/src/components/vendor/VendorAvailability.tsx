@@ -60,45 +60,45 @@ export default function VendorAvailability({ vendorId }: VendorAvailabilityProps
   };
 
   return (
-              <TabsContent value="availability" className="space-y-6">
+    <TabsContent value="availability" className="space-y-6">
 
-    <Card className="w-full shadow-md">
-      <CardHeader>
-        <CardTitle>Availability</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col md:flex-row gap-4">
-        {/* 📅 Calendar */}
-        <div className="w-full md:w-1/2 flex justify-center">
-          <Calendar
-            mode="single"
-            selected={selectedDate}
-            onSelect={setSelectedDate}
-            className="rounded-md border"
-          />
-        </div>
+      <Card className="w-full shadow-md">
+        <CardHeader>
+          <CardTitle>Availability</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col md:flex-row gap-4">
+          {/* 📅 Calendar */}
+          <div className="w-full md:w-1/2 flex justify-center">
+            <Calendar
+              mode="single"
+              selected={selectedDate}
+              onSelect={setSelectedDate}
+              className="rounded-md border"
+            />
+          </div>
 
-        {/* ⏰ Time Slots */}
-        <div className="w-full md:w-1/2 flex flex-col gap-2 max-h-[300px] overflow-y-auto">
-          {loading ? (
-            <p className="text-center text-gray-500">Loading slots...</p>
-          ) : timeSlots.length === 0 ? (
-            <p className="text-center text-gray-500">No slots available for this date.</p>
-          ) : (
-            timeSlots.map((slot, index) => (
-              <div
-                key={index}
-                className="flex justify-between items-center border rounded-md p-2"
-              >
-                <span>{slot.time}</span>
-                <Badge className={`${getStatusColor(slot.status)} text-white`}>
-                  {slot.status}
-                </Badge>
-              </div>
-            ))
-          )}
-        </div>
-      </CardContent>
-    </Card>
-              </TabsContent>
+          {/* ⏰ Time Slots */}
+          <div className="w-full md:w-1/2 flex flex-col gap-2 max-h-[300px] overflow-y-auto">
+            {loading ? (
+              <p className="text-center text-gray-500">Loading slots...</p>
+            ) : timeSlots.length === 0 ? (
+              <p className="text-center text-gray-500">No slots available for this date.</p>
+            ) : (
+              timeSlots.map((slot, index) => (
+                <div
+                  key={index}
+                  className="flex justify-between items-center border rounded-md p-2"
+                >
+                  <span>{slot.time}</span>
+                  <Badge className={`${getStatusColor(slot.status)} text-white`}>
+                    {slot.status}
+                  </Badge>
+                </div>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </TabsContent>
   );
 }

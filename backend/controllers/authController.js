@@ -3,6 +3,7 @@
 const User = require('../models/User');
 const CustomerProfile = require('../models/CustomerProfile');
 const VendorProfile = require('../models/VendorProfile');
+const { profile } = require('console');
 // Don't forget to import any necessary helper functions/constants here if needed
 
 // Helper function to send JWT token response (Unchanged)

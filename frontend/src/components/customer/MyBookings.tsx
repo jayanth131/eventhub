@@ -13,7 +13,7 @@ import {
 // import { ImageWithFallback } from '../figma/ImageWithFallback'; 
 
 // --- BACKEND SERVICE IMPORTS ---
-import { fetchCustomerBookings,markBookingAsCompleted } from '../services/vendorService';
+import { fetchCustomerBookings, markBookingAsCompleted } from '../services/vendorService';
 // -----------------------------
 
 
@@ -144,24 +144,24 @@ export default function MyBookings({ user, onNavigateHome, onLogout }: MyBooking
   const completedCount = bookings.filter(b => b.status === 'completed').length;
   const cancelledCount = bookings.filter(b => b.status === 'cancelled').length; // Added cancelled count
 
-    const handlePayRemaining = async (bookingId) => {
-  try {
-    const updatedBooking = await markBookingAsCompleted(bookingId);
-    console.log('✅ Booking marked as completed:', updatedBooking);
-    // show toast or refresh dashboard
-  } catch (err) {
-    console.error('❌ Error marking booking as completed:', err);
-    // show error toast
-  }
-};
+  const handlePayRemaining = async (bookingId) => {
+    try {
+      const updatedBooking = await markBookingAsCompleted(bookingId);
+      console.log('✅ Booking marked as completed:', updatedBooking);
+      // show toast or refresh dashboard
+    } catch (err) {
+      console.error('❌ Error marking booking as completed:', err);
+      // show error toast
+    }
+  };
   const totalSpent = bookings.reduce((sum, b) => {
-  if (b.status === 'completed') {
-    return sum + b.total;       // add total for completed bookings
-  } else {
-    return sum + b.paid;        // add paid for non-completed bookings
-  }
-}, 0);
-// Sum of advance paid
+    if (b.status === 'completed') {
+      return sum + b.total;       // add total for completed bookings
+    } else {
+      return sum + b.paid;        // add paid for non-completed bookings
+    }
+  }, 0);
+  // Sum of advance paid
 
   const getStatusConfig = (status: string) => {
     switch (status) {
@@ -512,7 +512,9 @@ export default function MyBookings({ user, onNavigateHome, onLogout }: MyBooking
                                           </div>
                                           <div className="text-right">
                                             <p className="text-sm text-gray-600">
-                                              Paid: <span className="text-2xl text-[var(--royal-maroon)] font-semibold">₹{booking.paid}</span>
+                                              Paid:<span className="text-2xl text-[var(--royal-maroon)] font-semibold">
+                                                ₹{booking.status === "completed" ? booking.total : booking.paid}
+                                              </span>
                                             </p>
                                             {/*                                             <p className="text-lg text-green-600">₹{booking.paid.toLocaleString()}</p> */}
                                           </div>

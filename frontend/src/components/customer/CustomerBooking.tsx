@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import { Calendar } from '../ui/calendar';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Slider } from '../ui/slider';
 import {
@@ -50,6 +50,7 @@ interface VendorProfile {
   advancePaymentAmount?: number; // Fetched via /details/card
   contactEmail?: string; // Fetched via /details/card
   availability?: TimeSlot[]; // Fetched via /details/card
+  ActiveStatus: boolean;
 }
 
 interface CustomerBookingProps {
@@ -165,6 +166,7 @@ const CustomerBooking: React.FC<CustomerBookingProps> = ({
         Phone: v.phone,
         description: v.description,
         standardSlots: v.standardSlots,
+        ActiveStatus: v.ActiveStatus,
         // Ensure availability is undefined initially for the button logic
         availability: v.availability // Should be undefined/null from the fast endpoint
       }));
@@ -268,7 +270,7 @@ const CustomerBooking: React.FC<CustomerBookingProps> = ({
       totalCost: selectedSlot.price, // CRITICAL: Price of the specific slot
       email: selectedVendor.contactEmail,
       phone: selectedVendor.Phone,
-      advancePaid: selectedVendor.advancePaymentAmount, // CRITICAL: Must match backend record
+      advancePaid: selectedSlot.price * 0.3, // CRITICAL: Must match backend record
       // Event Detail Fields
       eventDate: selectedDate.toISOString(), // CRITICAL: Uses ISO string for backend normalization
       eventTimeSlot: selectedSlot.time,
@@ -327,10 +329,11 @@ const CustomerBooking: React.FC<CustomerBookingProps> = ({
           vendor.location.toLowerCase().includes(searchQuery.toLowerCase());
 
         const vendorMinPrice = getMinPrice(vendor);
+
         console.log("vendor min price", vendorMinPrice);
         console.log(vendor.standardSlots)
         // FIX: Correctly check budget range bounds
-        const matchesBudget = vendorMinPrice >= budgetRange[1] && vendorMinPrice >= budgetRange[0];
+        const matchesBudget = vendorMinPrice <= budgetRange[1] && vendorMinPrice >= budgetRange[0];
 
         return matchesSearch && matchesBudget;
       })
@@ -353,6 +356,7 @@ const CustomerBooking: React.FC<CustomerBookingProps> = ({
     [vendorsList, searchQuery, budgetRange, sortBy]
   );
 
+  const activeVendors = filteredVendors.filter(v => v.ActiveStatus === true);
 
   // --- JSX Rendering ---
   return (
@@ -421,7 +425,7 @@ const CustomerBooking: React.FC<CustomerBookingProps> = ({
                   <CalendarIcon className="h-5 w-5 mr-2" />
                   Select Date
                 </CardTitle>
-                <CardDescription className="text-center">Choose your royal wedding date</CardDescription>
+                <CardDescription className="text-center">Choose your royal event date</CardDescription>
               </CardHeader>
               <CardContent className="p-4 flex justify-center">
                 <Calendar
@@ -507,30 +511,6 @@ const CustomerBooking: React.FC<CustomerBookingProps> = ({
                 </Button>
               </CardContent>
             </Card>
-
-            {/* Quick Stats */}
-            <Card className="border-4 border-[var(--royal-gold)] shadow-xl bg-gradient-to-br from-[var(--royal-maroon)] to-[var(--royal-copper)]">
-              <CardContent className="p-6 text-center">
-                <div className="space-y-2">
-                  <Crown className="h-10 w-10 text-[var(--royal-gold)] mx-auto fill-current" />
-                  <h3 className="text-white">Vendors Found</h3>
-                  <div className="text-5xl text-[var(--royal-gold)]">
-                    {loadingList ? '...' : filteredVendors.length}
-                  </div>
-                  <div className="space-y-1 text-sm text-[var(--royal-cream)]">
-                    {category && typeof category === 'string' && (
-                      <p className="text-[var(--royal-gold)]">{category}</p>
-                    )}
-                    {selectedLocation !== 'All Locations' && typeof selectedLocation === 'string' && (
-                      <p>near {selectedLocation}</p>
-                    )}
-                    <p className="text-xs">
-                      Budget: ₹{(budgetRange[0] / 1000).toFixed(0)}K - ₹{(budgetRange[1] / 1000).toFixed(0)}K
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
           </div>
 
           {/* Vendors List */}
@@ -560,169 +540,209 @@ const CustomerBooking: React.FC<CustomerBookingProps> = ({
                   {category && typeof category === 'string' ? category : 'All Vendors'}
                 </h1>
                 <p className="text-gray-700 mt-1">
-                  {filteredVendors.length} vendor{filteredVendors.length !== 1 ? 's' : ''} found
+                  Showing{" "}
+                  <span className="font-semibold text-[var(--royal-maroon)]">
+                    {filteredVendors.filter(vendor => vendor.ActiveStatus === true).length}
+                  </span>{" "}
+                  active vendor
+                  {filteredVendors.filter(vendor => vendor.ActiveStatus === true).length !== 1 ? 's' : ''} found
                 </p>
-              </div>
 
-              <div className="w-full sm:w-64">
-                <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-full border-2 border-[var(--royal-gold)]/30">
-                    <SelectValue placeholder="Sort by" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {sortOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
             </div>
 
             {/* Vendors List */}
             <div className="space-y-6">
-              {filteredVendors.map((vendor) => (
-                <Card key={vendor._id} className="overflow-hidden border-4 border-[var(--royal-gold)]/20 hover:border-[var(--royal-gold)] shadow-xl bg-white">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="relative overflow-hidden">
-                      <ImageWithFallback
-                        // Use the first image URL from the array, or a placeholder
-                        src={vendor.imageUrls?.[0] || `https://placehold.co/800x600/8B0000/FFD700?text=${vendor.serviceName}`}
-                        alt={vendor.serviceName}
-                        className="w-full h-64 md:h-full object-cover"
-                      />
+              {filteredVendors
+                .filter((vendor) => vendor.ActiveStatus === true)
+                .map((vendor) => (
+                  <Card
+                    key={vendor._id}
+                    className="overflow-hidden border-4 border-[var(--royal-gold)]/20 hover:border-[var(--royal-gold)] shadow-xl bg-white"
+                  >
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {/* ✅ Image / Load Images + Modal */}
+                      <div className="relative overflow-hidden">
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            {vendor.imageUrls && vendor.imageUrls.length > 0 ? (
+                              <img
+                                src={vendor.imageUrls[0]}
+                                alt={vendor.serviceName}
+                                className="w-full h-64 md:h-full object-cover cursor-pointer hover:opacity-90 transition"
+                              />
+                            ) : (
+                              <p className="text-gray-600 mb-4 cursor-pointer underline hover:text-[var(--royal-gold)] transition text-center pt-24">
+                                Load images
+                              </p>
+                            )}
+                          </DialogTrigger>
 
-                      <div className="absolute top-4 left-4">
-                        <Badge className="bg-gradient-to-r from-[var(--royal-gold)] to-[var(--royal-orange)] text-white shadow-lg border-2 border-white">
-                          ⭐ Royal Choice
-                          {console.log(vendor.serviceName)}
-                        </Badge>
+                          <DialogContent className="max-w-4xl bg-white max-h-[80vh] overflow-y-auto">
+                            <DialogHeader>
+                              <DialogTitle className="text-[var(--royal-maroon)]">
+                                {vendor.serviceName} – Images
+                              </DialogTitle>
+                            </DialogHeader>
+
+                            {vendor.imageUrls && vendor.imageUrls.length > 0 ? (
+                              <div
+                                className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-4
+                   max-h-[400px] overflow-y-auto pr-2"
+                              >
+                                {vendor.imageUrls.map((imgUrl: string, index: number) => (
+                                  <div
+                                    key={index}
+                                    className="overflow-hidden rounded-lg border shadow-sm hover:shadow-md transition"
+                                  >
+                                    <img
+                                      src={imgUrl}
+                                      alt={`Image ${index + 1}`}
+                                      className="w-full h-48 object-cover hover:scale-105 transition-transform"
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-gray-500 text-center py-6">
+                                No images available for this vendor.
+                              </p>
+                            )}
+                          </DialogContent>
+                        </Dialog>
+
+
+
+                        {/* ⭐ Badge */}
+                        <div className="absolute top-4 left-4">
+                          <Badge className="bg-gradient-to-r from-[var(--royal-gold)] to-[var(--royal-orange)] text-white shadow-lg border-2 border-white">
+                            ⭐ Royal Choice
+                          </Badge>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="md:col-span-2 p-6">
-                      <div className="flex items-start justify-between mb-4">
-                        <div>
-                          <h3 className="text-2xl text-[var(--royal-maroon)]">{vendor.serviceName}</h3>
-                          <p className="text-[var(--royal-gold)]">{vendor.category}</p>
-                          <div className="flex items-center space-x-4 mt-3">
-                            <div className="flex items-center space-x-1">
-                              {/* <Star className="h-5 w-5 text-[var(--royal-gold)] fill-current" /> */}
-                              {/* <span>{vendor.averageRating.toFixed(1)}</span> */}
-                              {/* <span className="text-sm text-gray-500">({vendor.reviewCount} reviews)</span> */}
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <MapPin className="h-4 w-4 text-gray-400" />
-                              <span className="text-sm text-gray-600">{vendor.location}</span>
+                      {/* ✅ Vendor Details */}
+                      <div className="md:col-span-2 p-6">
+                        <div className="flex items-start justify-between mb-4">
+                          <div>
+                            <h3 className="text-2xl text-[var(--royal-maroon)]">{vendor.serviceName}</h3>
+                            <p className="text-[var(--royal-gold)]">{vendor.category}</p>
+                            <div className="flex items-center space-x-4 mt-3">
+                              <div className="flex items-center space-x-1" />
+                              <div className="flex items-center space-x-1">
+                                <MapPin className="h-4 w-4 text-gray-400" />
+                                <span className="text-sm text-gray-600">{vendor.location}</span>
+                              </div>
                             </div>
                           </div>
                         </div>
-                        {/* <div className="text-right">
-                          <p className="text-xl text-[var(--royal-maroon)]">₹{vendor.totalCost.toLocaleString()}</p>
-                          <span className="text-sm text-gray-500">Est. Total Cost</span>
-                        </div> */}
-                      </div>
 
-                      <p className="text-gray-600 mb-4">{vendor.description}</p>
+                        <p className="text-gray-600 mb-4">{vendor.description}</p>
 
-                      {/* --- SLOTS, PHONE, EMAIL (Conditional Display) --- */}
-                      {/* This block expands ONLY after the user clicks the 'View Slots' button and the details are fetched */}
-                      {vendor.availability && (
-                        <>
-                          <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center space-x-4 text-sm">
-                              <div className="flex items-center space-x-1 text-gray-600">
-                                <Phone className="h-4 w-4" />
-                                <span>{vendor.phone}</span>
-                              </div>
-                              <div className="flex items-center space-x-1 text-gray-600">
-                                <Mail className="h-4 w-4" />
-                                <span>{vendor.contactEmail}</span>
+                        {vendor.availability && (
+                          <>
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="flex items-center space-x-4 text-sm">
+                                <div className="flex items-center space-x-1 text-gray-600">
+                                  <Phone className="h-4 w-4" />
+                                  <span>{vendor.phone}</span>
+                                </div>
+                                <div className="flex items-center space-x-1 text-gray-600">
+                                  <Mail className="h-4 w-4" />
+                                  <span>{vendor.contactEmail}</span>
+                                </div>
                               </div>
                             </div>
-                          </div>
 
-                          {/* Time Slots */}
-                          <div>
-                            <h4 className="text-[var(--royal-maroon)] mb-3 flex items-center">
-                              <Clock className="h-5 w-5 mr-2" />
-                              Available Slots
-                            </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                              {(() => {
-                                // Check if a full day slot exists
-                                const isFullDayBooked = vendor.availability.some(
-                                  (s) => s.time.toLowerCase() === 'full day' && s.status !== 'available'
-                                );
+                            {/* Time Slots */}
+                            <div>
+                              <h4 className="text-[var(--royal-maroon)] mb-3 flex items-center">
+                                <Clock className="h-5 w-5 mr-2" />
+                                Available Slots
+                              </h4>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                {(() => {
+                                  const isFullDayBooked = vendor.availability.some(
+                                    (s) => s.time.toLowerCase() === 'full day' && s.status !== 'available'
+                                  );
 
-                                return vendor.availability.map((slot, index) => {
-                                  // Mark slot as booked if it's full day booked OR its status is not available
-                                  const isBooked = isFullDayBooked || slot.status !== 'available';
+                                  return vendor.availability.map((slot, index) => {
+                                    const isBooked =
+                                      isFullDayBooked || slot.status !== 'available';
 
-                                  return (
-                                    <Button
-                                      key={index}
-                                      variant={!isBooked ? "default" : "outline"}
-                                      onClick={() => {
-                                        if (!isBooked) {
-                                          const mockSlot: LocalTimeSlot = {
-                                            id: `${index}`,
-                                            time: slot.time,
-                                            available: !isBooked,
-                                            price: slot.price
-                                          };
-                                          handleBookSlot(vendor, mockSlot);
-                                        }
-                                      }}
-                                      disabled={isBooked}
-                                      className={`w-full py-4 px-4 flex flex-col items-center justify-center min-h-[80px] transition-all duration-200 ${!isBooked
+                                    return (
+                                      <Button
+                                        key={index}
+                                        variant={!isBooked ? 'default' : 'outline'}
+                                        onClick={() => {
+                                          if (!isBooked) {
+                                            const mockSlot = {
+                                              id: `${index}`,
+                                              time: slot.time,
+                                              available: !isBooked,
+                                              price: slot.price,
+                                            };
+                                            handleBookSlot(vendor, mockSlot);
+                                          }
+                                        }}
+                                        disabled={isBooked}
+                                        className={`w-full py-4 px-4 flex flex-col items-center justify-center min-h-[80px] transition-all duration-200 ${!isBooked
                                           ? 'bg-gradient-to-r from-[var(--royal-maroon)] to-[var(--royal-copper)] hover:from-[var(--royal-copper)] hover:to-[var(--royal-maroon)] text-white border-2 border-[var(--royal-gold)] hover:scale-105 hover:shadow-lg'
                                           : 'opacity-60 cursor-not-allowed bg-gray-100 border-2 border-gray-200 text-gray-500'
-                                        }`}
-                                    >
-                                      <span className="text-xs font-medium mb-1">{slot.time}</span>
-                                      <span className="text-lg font-semibold">₹{slot.price.toLocaleString()}</span>
-                                      {isBooked && (
-                                        <span className="text-xs text-red-500 mt-1 font-medium bg-red-50 px-2 py-1 rounded-full">
-                                          Already Booked
+                                          }`}
+                                      >
+                                        <span className="text-xs font-medium mb-1">
+                                          {slot.time}
                                         </span>
-                                      )}
-                                    </Button>
-                                  );
-                                });
-                              })()}
-
+                                        <span className="text-lg font-semibold">
+                                          ₹{slot.price.toLocaleString()}
+                                        </span>
+                                        {isBooked && (
+                                          <span className="text-xs text-red-500 mt-1 font-medium bg-red-50 px-2 py-1 rounded-full">
+                                            Already Booked
+                                          </span>
+                                        )}
+                                      </Button>
+                                    );
+                                  });
+                                })()}
+                              </div>
                             </div>
-                          </div>
-                        </>
-                      )}
+                          </>
+                        )}
 
-                      {/* --- BUTTON TO LOAD DETAILS (If slots are missing) --- */}
-                      {!vendor.availability && (
-                        <Button
-                          onClick={() => fetchDetailsAndBook(vendor._id, { id: 'default', time: 'N/A', available: true, price: vendor.totalCost })}
-                          className="w-full bg-[var(--royal-gold)] hover:bg-[var(--royal-copper)] text-[var(--royal-maroon)] border border-[var(--royal-maroon)]"
-                        >
-                          View Slots & Contact Details
-                        </Button>
-                      )}
-
+                        {!vendor.availability && (
+                          <Button
+                            onClick={() =>
+                              fetchDetailsAndBook(vendor._id, {
+                                id: 'default',
+                                time: 'N/A',
+                                available: true,
+                                price: vendor.totalCost,
+                              })
+                            }
+                            className="w-full bg-[var(--royal-gold)] hover:bg-[var(--royal-copper)] text-[var(--royal-maroon)] border border-[var(--royal-maroon)]"
+                          >
+                            View Slots & Contact Details
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </Card>
-              ))}
+                  </Card>
+                ))}
 
-              {filteredVendors.length === 0 && !loadingList && (
+              {filteredVendors.filter(vendor => vendor.ActiveStatus === true).length === 0 && !loadingList && (
                 <Card className="border-4 border-[var(--royal-gold)]/30 shadow-xl bg-white p-12 text-center">
                   <Sparkles className="h-16 w-16 text-[var(--royal-gold)] mx-auto mb-4" />
-                  <h3 className="text-2xl text-[var(--royal-maroon)] mb-2">No vendors found"</h3>
+                  <h3 className="text-2xl text-[var(--royal-maroon)] mb-2">
+                    No active vendors found
+                  </h3>
                   <p className="text-gray-600">Try adjusting your search criteria</p>
-
                 </Card>
-
               )}
             </div>
+
+
           </div>
         </div>
       </div >
@@ -838,7 +858,7 @@ const CustomerBooking: React.FC<CustomerBookingProps> = ({
                     {/* {console.log("selected vendor",selectedVendor)} */}
                     <div className="flex justify-between">
                       <span className="text-gray-600">Advance Payment:</span>
-                      <span className="text-[var(--royal-gold)]">₹{selectedVendor.advancePaymentAmount?.toLocaleString()}</span>
+                      <span className="text-[var(--royal-gold)]">₹{selectedSlot.price*0.3}</span>
                     </div>
                   </div>
 

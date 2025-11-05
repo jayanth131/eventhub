@@ -43,7 +43,7 @@ exports.getVendors = async (req, res, next) => {
         query = query.sort('-averageRating');
 
         // CRITICAL UPDATE: Select MINIMAL fields AND standardSlots for pricing preview
-        query = query.select('businessName description location averageRating totalCost imageUrls reviewCount category standardSlots email phone');
+        query = query.select('businessName description location averageRating totalCost imageUrls reviewCount category standardSlots email phone ActiveStatus');
 
         const vendors = await query;
 

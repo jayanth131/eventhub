@@ -15,7 +15,7 @@ import { ImageWithFallback } from '../figma/ImageWithFallback';
 import { toast } from 'sonner@2.0.3';
 // --- API IMPORTS ---
 import { fetchVendorList, fetchVendorDetailsForCard, submitBooking } from '../services/vendorService';
-
+import StripePaymentComponent from './StripePaymentComponent';
 
 // --- INTERFACES ALIGNED WITH BACKEND API RESPONSE ---
 interface User {
@@ -247,58 +247,14 @@ const CustomerBooking: React.FC<CustomerBookingProps> = ({
 
   // MODIFIED: handlePayment now submits to backend API
   const handlePayment = async () => {
-    if (!selectedVendor || !selectedSlot || !selectedDate) {
-      toast.error("Missing booking data. Please select date and slot.");
-      return;
-    }
-    // Check for required advance amount before payment attempt
-    if (selectedVendor.advancePaymentAmount === undefined || selectedVendor.advancePaymentAmount === null) {
-      toast.error("Vendor advance amount missing. Cannot proceed.");
-      return;
-    }
+  if (!selectedVendor || !selectedSlot || !selectedDate) {
+    toast.error("Missing booking data. Please select date and slot.");
+    return;
+  }
 
+  setBookingStep("payment"); // Show Stripe payment screen
+};
 
-    setBookingStep('payment');
-    toast.loading("Processing payment and reserving slot...");
-
-    const bookingPayload = {
-      // Required foreign key
-      vendorId: selectedVendor._id,
-      vendorName: selectedVendor.serviceName, // Redundant but useful for records
-      vendorLocation: selectedVendor.location, // Redundant but useful for records
-      // Transactional fields
-      totalCost: selectedSlot.price, // CRITICAL: Price of the specific slot
-      email: selectedVendor.contactEmail,
-      phone: selectedVendor.Phone,
-      advancePaid: selectedSlot.price * 0.3, // CRITICAL: Must match backend record
-      // Event Detail Fields
-      eventDate: selectedDate.toISOString(), // CRITICAL: Uses ISO string for backend normalization
-      eventTimeSlot: selectedSlot.time,
-
-      // Profile/Display Fields
-      eventType: eventType === 'Other' ? customEventType : eventType,
-      eventHolderNames: eventHolderNames, // The array of names
-    };
-
-
-    try {
-      await submitBooking(bookingPayload);
-      toast.dismiss();
-
-      // Success: Navigate to confirmation screen
-      setBookingStep('confirmation');
-      toast.success('Booking confirmed! The vendor will contact you shortly.');
-
-      // Refresh vendor list to show the slot as booked
-      loadVendors();
-
-    } catch (err: any) {
-      toast.dismiss();
-      setBookingStep('details');
-      toast.error(`Booking Failed: ${err.message}. Please try again.`);
-      console.error(`[ERROR] Booking submission failed: ${err.message}`);
-    }
-  };
 
   // --- Utility Functions (Unchanged) ---
   const addEventHolderName = () => {
@@ -873,14 +829,54 @@ const CustomerBooking: React.FC<CustomerBookingProps> = ({
                 </div>
               )}
 
-              {bookingStep === 'payment' && (
-                <div className="py-8 text-center">
-                  <div className="inline-block animate-spin">
-                    <Crown className="h-16 w-16 text-[var(--royal-gold)]" />
-                  </div>
-                  <p className="mt-4 text-gray-600">Processing your royal booking...</p>
-                </div>
-              )}
+              {bookingStep === "payment" && (
+  <StripePaymentComponent
+    amount={selectedSlot.price}
+    bookingPayload={{
+      vendorId: selectedVendor._id,
+      vendorName: selectedVendor.serviceName,
+      vendorLocation: selectedVendor.location,
+      totalCost: selectedSlot.price,
+      email: selectedVendor.contactEmail,
+      phone: selectedVendor.Phone,
+      advancePaid: selectedSlot.price * 0.3,
+      eventDate: selectedDate.toISOString(),
+      eventTimeSlot: selectedSlot.time,
+      eventType: eventType === "other" ? customEventType : eventType,
+      eventHolderNames,
+    }}
+    onSuccess={async () => {
+      toast.loading("Creating booking…");
+
+      try {
+        await submitBooking({
+          vendorId: selectedVendor._id,
+          vendorName: selectedVendor.serviceName,
+          vendorLocation: selectedVendor.location,
+          totalCost: selectedSlot.price,
+          email: selectedVendor.contactEmail,
+          phone: selectedVendor.Phone,
+          advancePaid: selectedSlot.price * 0.3,
+          eventDate: selectedDate.toISOString(),
+          eventTimeSlot: selectedSlot.time,
+          eventType: eventType === "other" ? customEventType : eventType,
+          eventHolderNames,
+        });
+
+        toast.dismiss();
+        toast.success("Booking confirmed!");
+
+        setBookingStep("confirmation");
+        loadVendors();
+      } catch (err) {
+        toast.dismiss();
+        toast.error("Booking failed: " + err.message);
+        setBookingStep("details");
+      }
+    }}
+  />
+)}
+
 
               {bookingStep === 'confirmation' && (
                 <div className="py-8 text-center space-y-6">

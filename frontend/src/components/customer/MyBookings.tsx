@@ -1,21 +1,22 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion'; // Changed from 'motion/react'
+import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import {
   ArrowLeft, Crown, Sparkles, Calendar, Clock, MapPin, Phone, Mail,
-  Star, CheckCircle, XCircle, AlertCircle, Download, MessageSquare,
-  CreditCard, LogOut, Receipt, Heart
+  Star, CheckCircle, XCircle, AlertCircle, Download, Receipt, LogOut
 } from 'lucide-react';
-// Assuming ImageWithFallback is defined elsewhere
-// import { ImageWithFallback } from '../figma/ImageWithFallback'; 
 
 // --- BACKEND SERVICE IMPORTS ---
 import { fetchCustomerBookings, markBookingAsCompleted } from '../services/vendorService';
+import { createRemainingPaymentIntent } from '../services/paymentService'; // new service for remaining payment
 // -----------------------------
+import { generateCombinedReceiptPDF } from '../utils/receiptGenerator';
 
+import { useStripe, useElements, CardElement } from "@stripe/react-stripe-js";
+import { toast } from 'react-hot-toast';
 
 interface User {
   id: string;
@@ -30,25 +31,54 @@ interface MyBookingsProps {
   onLogout: () => void;
 }
 
-// Interface aligned with the transformed booking data from the backend (fetchCustomerBookings)
 interface BookingRecord {
   id: string;
-  bookingId: string; // The MongoDB ID
+  bookingId: string;
+
+  // Vendor Info
   vendorName: string;
   serviceCategory: string;
   vendorLocation: string;
   vendorImage: string;
-  vendorEmail: string; // Fetched from User model linked to vendor
+  vendorEmail: string;
+
+  // Booking Details
   date: string; // YYYY-MM-DD
   time: string;
-  total: number; // totalCost
-  paid: number; // advanceAmountPaid
-  balance: number; // calculated balance
-  status: 'confirmed' | 'completed' | 'canceled_customer' | 'canceled_vendor' | 'pending_vendor' | 'upcoming' | 'cancelled';
-  location: string; // vendorLocation
+  total: number;
+  paid: number;
+  balance: number;
+
+  status:
+    | "confirmed"
+    | "completed"
+    | "canceled_customer"
+    | "canceled_vendor"
+    | "pending_vendor"
+    | "upcoming"
+    | "cancelled";
+
+  Phone?: string;
+  location?: string;
+
   rating?: number;
   review?: string;
+
+  // ⭐ Advance Payment Fields
+  advancePaymentIntentId?: string | null;
+  advanceTransactionId?: string | null;
+  advanceReceiptUrl?: string | null;
+
+  // ⭐ Final / Remaining Payment Fields
+  finalPaymentIntentId?: string | null;
+  finalTransactionId?: string | null;
+  finalReceiptUrl?: string | null;
+
+  // Event Details
+  eventHolderNames?: string[];
+  eventType?: string;
 }
+
 
 const AnimatedCounter = ({ value, prefix = '', suffix = '' }: { value: number; prefix?: string; suffix?: string }) => {
   const [count, setCount] = useState(0);
@@ -79,7 +109,16 @@ export default function MyBookings({ user, onNavigateHome, onLogout }: MyBooking
   const [selectedTab, setSelectedTab] = useState<'all' | 'upcoming' | 'completed' | 'cancelled'>('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [bookings, setBookings] = useState<BookingRecord[]>([]); // API Data state
+  const [bookings, setBookings] = useState<BookingRecord[]>([]);
+
+  // Stripe hooks
+  const stripe = useStripe();
+  const elements = useElements();
+
+  // State for the payment modal
+  const [selectedBookingForPayment, setSelectedBookingForPayment] = useState<BookingRecord | null>(null);
+  const [processingPayment, setProcessingPayment] = useState(false);
+  const [cardError, setCardError] = useState<string | null>(null);
 
   // --- FETCH API DATA ---
   const loadBookings = useCallback(async () => {
@@ -87,34 +126,45 @@ export default function MyBookings({ user, onNavigateHome, onLogout }: MyBooking
     setError(null);
     try {
       const data = await fetchCustomerBookings(); // API call to /api/bookings/me
+      console.log("bookings:{}",data)
 
-      // Transform the backend status codes into frontend display statuses
-      const mappedData = data.map((b: any) => ({
-        ...b,
-        id: b.bookingId,
-        // vendorLocation: b.vendor.location,
-        // vendorImage: b.vendorImage || 'https://placehold.co/400x250/8B0000/FFD700?text=Venue',
-        // vendorName: b.vendor.vendorName,
-        // vendorCategory: b.serviceCategory, // Use the service category stored in the booking record
+const mappedData = data.map((b: any) => ({
+  ...b,
 
-        // Map backend status to frontend display status
-        status: b.status === 'completed'
-          ? 'completed'
-          : b.status.includes('cancel')
-            ? 'cancelled'
-            : 'upcoming',
+  id: b.bookingId,
 
-        total: b.total,
-        paid: b.paid,
-        balance: b.balance,
-        Phone: b.phone,
-        vendorEmail: b.email,
+  // Normalize booking status
+  status: b.status === "completed"
+    ? "completed"
+    : b.status?.includes("cancel")
+    ? "cancelled"
+    : "upcoming",
 
+  total: b.total,
+  paid: b.paid,
+  balance: b.balance,
 
-      }));
+  Phone: b.phone,
+  vendorEmail: b.email,
+
+  // ⭐ Advance Payment Fields
+  advancePaymentIntentId: b.advancePaymentIntentId || null,
+  advanceTransactionId: b.advanceTransactionId || null,
+  advanceReceiptUrl: b.advanceReceiptUrl || null,
+
+  // ⭐ Final Payment Fields
+  finalPaymentIntentId: b.finalPaymentIntentId || null,
+  finalTransactionId: b.finalTransactionId || null,
+  finalReceiptUrl: b.finalReceiptUrl || null,
+
+  // ⭐ Event Fields
+  eventHolderNames: b.eventHolderNames || [],
+  eventType: b.eventType || "N/A",
+}));
+
 
       setBookings(mappedData);
-      console.log("mapped data: my customer bookings", mappedData)
+      // console.log("mapped data: my customer bookings", mappedData)
     } catch (err: any) {
       console.error("Failed to load customer bookings:", err);
       setError("Unable to load booking history. Please check your network or token.");
@@ -136,32 +186,20 @@ export default function MyBookings({ user, onNavigateHome, onLogout }: MyBooking
       'all': 'all'
     };
     const targetStatus = statusMap[selectedTab];
-
     return bookings.filter(b => targetStatus === 'all' || b.status === targetStatus);
   }, [bookings, selectedTab]);
 
   const upcomingCount = bookings.filter(b => b.status === 'upcoming').length;
   const completedCount = bookings.filter(b => b.status === 'completed').length;
-  const cancelledCount = bookings.filter(b => b.status === 'cancelled').length; // Added cancelled count
+  const cancelledCount = bookings.filter(b => b.status === 'cancelled').length;
 
-  const handlePayRemaining = async (bookingId) => {
-    try {
-      const updatedBooking = await markBookingAsCompleted(bookingId);
-      console.log('✅ Booking marked as completed:', updatedBooking);
-      // show toast or refresh dashboard
-    } catch (err) {
-      console.error('❌ Error marking booking as completed:', err);
-      // show error toast
-    }
-  };
   const totalSpent = bookings.reduce((sum, b) => {
     if (b.status === 'completed') {
-      return sum + b.total;       // add total for completed bookings
+      return sum + b.total;
     } else {
-      return sum + b.paid;        // add paid for non-completed bookings
+      return sum + b.paid;
     }
   }, 0);
-  // Sum of advance paid
 
   const getStatusConfig = (status: string) => {
     switch (status) {
@@ -190,8 +228,124 @@ export default function MyBookings({ user, onNavigateHome, onLogout }: MyBooking
           text: 'Unknown'
         };
     }
+  };
+
+  // ORIGINAL: used to directly mark completed — now still used after successful payment
+  // keep this to reuse your existing endpoint
+  const completeBookingAndRefresh = async (bookingId: string) => {
+    try {
+      await markBookingAsCompleted(bookingId);
+      await loadBookings();
+      toast.success("Booking marked as completed and balance updated.");
+    } catch (err) {
+      console.error("Error completing booking:", err);
+      toast.error("Failed to mark booking completed. Please contact support.");
+    }
+  };
+
+  // New: handle opening the payment modal (keeps UI identical)
+  const openPaymentModal = (booking: BookingRecord) => {
+    setCardError(null);
+    setSelectedBookingForPayment(booking);
+  };
+
+  // New: handle the actual payment flow for remaining balance
+  const confirmRemainingPayment = async () => {
+  if (!selectedBookingForPayment) return;
+
+  if (!stripe || !elements) {
+    toast.error("Payment service not loaded. Try again.");
+    return;
+  }
+
+  setProcessingPayment(true);
+  toast.loading("Initializing payment...");
+
+  try {
+    const amountToPay = selectedBookingForPayment.balance;
+    const bookingId = selectedBookingForPayment.id;
+    const token = localStorage.getItem("authToken");
+
+    // 1️⃣ Create payment intent (returns BOTH clientSecret & paymentIntentId)
+    const { clientSecret, paymentIntentId } =
+      await createRemainingPaymentIntent(bookingId, amountToPay);
+
+    // 2️⃣ Confirm card payment
+    const cardElement = elements.getElement(CardElement);
+    if (!cardElement) {
+      toast.dismiss();
+      setProcessingPayment(false);
+      setCardError("Card input not found.");
+      return;
+    }
+
+    toast.loading("Processing payment...");
+
+    const result = await stripe.confirmCardPayment(clientSecret, {
+      payment_method: { card: cardElement },
+    });
+
+    if (result.error) {
+      toast.dismiss();
+      setProcessingPayment(false);
+      toast.error(result.error.message || "Payment failed.");
+      setCardError(result.error.message);
+      return;
+    }
+
+    if (result.paymentIntent?.status !== "succeeded") {
+      toast.dismiss();
+      setProcessingPayment(false);
+      toast.error("Payment not completed.");
+      console.log("💰 STRIPE PAYMENT SUCCESS >>>", {
+      paymentIntentId: result.paymentIntent.id,
+     amount: result.paymentIntent.amount,
+    currency: result.paymentIntent.currency,
+    status: result.paymentIntent.status,
+});
+
+      return;
+    }
+
+    toast.dismiss();
+    toast.success("Payment successful! Saving receipt info...");
+
+    // 3️⃣ Save final payment in backend (THIS IS REQUIRED)
+    await fetch("http://localhost:5000/api/payments/save-final", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        bookingId,
+        paymentIntentId: result.paymentIntent.id,
+      }),
+    });
+
+    // 4️⃣ Refresh bookings
+    await loadBookings();
+
+    // 5️⃣ Close modal
+    setSelectedBookingForPayment(null);
+    setProcessingPayment(false);
+    toast.success("Booking updated successfully!");
+
+  } catch (err: any) {
+    console.error("Payment error:", err);
+    toast.dismiss();
+    toast.error(err.message || "Payment error occurred.");
+    setCardError(err.message);
+    setProcessingPayment(false);
+  }
+};
 
 
+  // If user cancels payment modal
+  const closePaymentModal = () => {
+    setSelectedBookingForPayment(null);
+    setCardError(null);
+    setProcessingPayment(false);
   };
 
   return (
@@ -291,7 +445,7 @@ export default function MyBookings({ user, onNavigateHome, onLogout }: MyBooking
             {
               title: 'Total Invested',
               value: totalSpent,
-              icon: CreditCard,
+              icon: Receipt,
               color: 'from-purple-500 to-pink-600',
               prefix: '₹',
             },
@@ -448,8 +602,6 @@ export default function MyBookings({ user, onNavigateHome, onLogout }: MyBooking
                                           <p className="text-[var(--royal-gold)]">{booking.serviceCategory}</p>
                                         </div>
 
-
-
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                                           <div className="flex items-center text-gray-700">
                                             <Calendar className="h-4 w-4 mr-2 text-[var(--royal-gold)]" />
@@ -508,7 +660,6 @@ export default function MyBookings({ user, onNavigateHome, onLogout }: MyBooking
                                             <p className="text-sm text-gray-600">
                                               Total Amount: <span className="text-2xl text-[var(--royal-maroon)] font-semibold">₹{booking.total}</span>
                                             </p>
-                                            {/*                                             <p className="text-lg text-green-600">₹{booking.paid.toLocaleString()}</p> */}
                                           </div>
                                           <div className="text-right">
                                             <p className="text-sm text-gray-600">
@@ -516,14 +667,12 @@ export default function MyBookings({ user, onNavigateHome, onLogout }: MyBooking
                                                 ₹{booking.status === "completed" ? booking.total : booking.paid}
                                               </span>
                                             </p>
-                                            {/*                                             <p className="text-lg text-green-600">₹{booking.paid.toLocaleString()}</p> */}
                                           </div>
                                           {booking.paid < booking.total && (
                                             <div className="text-right">
                                               <p className="text-sm text-gray-600">
                                                 balance: <span className="text-2xl text-[var(--royal-maroon)] font-semibold">₹{booking.balance}</span>
                                               </p>
-                                              {/*                                             <p className="text-lg text-green-600">₹{booking.paid.toLocaleString()}</p> */}
                                             </div>
                                           )}
                                         </div>
@@ -531,28 +680,28 @@ export default function MyBookings({ user, onNavigateHome, onLogout }: MyBooking
                                         <div className="space-y-2 mt-4">
                                           <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                                             <Button
-                                              className="w-full bg-gradient-to-r from-[var(--royal-maroon)] to-[var(--royal-copper)] hover:from-[var(--royal-copper)] hover:to-[var(--royal-maroon)] text-white border-2 border-[var(--royal-gold)]"
+                                             className="w-full bg-gradient-to-r from-[var(--royal-maroon)] to-[var(--royal-copper)] hover:from-[var(--royal-copper)] hover:to-[var(--royal-maroon)] text-white border-2 border-[var(--royal-gold)]"
                                               size="sm"
+                                              onClick={() => generateCombinedReceiptPDF(booking, user)}
                                             >
                                               <Download className="h-4 w-4 mr-2" />
                                               Download Receipt
                                             </Button>
+
                                           </motion.div>
+
                                           {booking.status === 'upcoming' && (
                                             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                                              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                                                <Button
-                                                  className="w-full bg-gradient-to-r from-[var(--royal-maroon)] to-[var(--royal-copper)] hover:from-[var(--royal-copper)] hover:to-[var(--royal-maroon)] text-white border-2 border-[var(--royal-gold)]"
-                                                  size="sm" onClick={() => handlePayRemaining(booking.id)}
-                                                >
-                                                  {/* <Download className="h-4 w-4 mr-2" />
-                                               */}
-                                                  Pay Remaining Balance
-
-                                                </Button>
-                                              </motion.div>
+                                              <Button
+                                                className="w-full bg-gradient-to-r from-[var(--royal-maroon)] to-[var(--royal-copper)] hover:from-[var(--royal-copper)] hover:to-[var(--royal-maroon)] text-white border-2 border-[var(--royal-gold)]"
+                                                size="sm"
+                                                onClick={() => openPaymentModal(booking)}
+                                              >
+                                                Pay Remaining Balance
+                                              </Button>
                                             </motion.div>
                                           )}
+
                                           {booking.status === 'completed' && !booking.rating && (
                                             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                                               <Button
@@ -583,6 +732,81 @@ export default function MyBookings({ user, onNavigateHome, onLogout }: MyBooking
           </Card>
         </motion.div>
       </div>
+
+      {/* ---------------------------
+          PAYMENT MODAL (Stripe)
+         --------------------------- */}
+      <AnimatePresence>
+        {selectedBookingForPayment && (
+          <motion.div
+            key="payment-modal"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center"
+          >
+            <div className="absolute inset-0 bg-black/40" onClick={closePaymentModal} />
+
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 20, opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="relative w-full max-w-md mx-4 bg-white rounded-lg shadow-2xl p-6 border-2 border-[var(--royal-gold)]"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="text-lg text-[var(--royal-maroon)] font-semibold">Pay Remaining Balance</h3>
+                  <p className="text-sm text-gray-600">Booking ID: {selectedBookingForPayment.id}</p>
+                </div>
+                <button onClick={closePaymentModal} className="text-gray-500 hover:text-gray-700">
+                  ✕
+                </button>
+              </div>
+
+              <div className="mb-4">
+                <p className="text-sm text-gray-700">Vendor: <strong className="text-[var(--royal-maroon)]">{selectedBookingForPayment.vendorName}</strong></p>
+                <p className="text-sm text-gray-700">Outstanding Balance: <strong className="text-[var(--royal-maroon)]">₹{selectedBookingForPayment.balance}</strong></p>
+              </div>
+
+              <div className="mb-4">
+                {/* Stripe CardElement */}
+                <div className="p-3 border rounded-md">
+                  <CardElement options={{
+                    style: {
+                      base: {
+                        fontSize: '16px',
+                        color: '#111827',
+                        '::placeholder': { color: '#9CA3AF' },
+                      },
+                      invalid: { color: '#ef4444' },
+                    },
+                  }} />
+                </div>
+                {cardError && <p className="text-sm mt-2 text-red-600">{cardError}</p>}
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <Button
+                  onClick={confirmRemainingPayment}
+                  disabled={processingPayment}
+                  className="w-full bg-gradient-to-r from-[var(--royal-maroon)] to-[var(--royal-copper)] text-white"
+                >
+                  {processingPayment ? 'Processing…' : `Pay ₹${selectedBookingForPayment.balance}`}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={closePaymentModal}
+                  disabled={processingPayment}
+                  className="w-full border-2 border-[var(--royal-gold)] text-[var(--royal-maroon)]"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

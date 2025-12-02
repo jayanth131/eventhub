@@ -70,7 +70,15 @@ const BookingSchema = new mongoose.Schema({
         enum: ['confirmed', 'pending_vendor', 'canceled_customer', 'canceled_vendor', 'completed','manulaly_confirmed'],
         default: 'confirmed'
     },
-    notes: { type: String }
+    notes: { type: String },
+    paymentIntentId: { type: String, default: null },
+stripeTransactionId: { type: String, default: null },
+stripeReceiptUrl: { type: String, default: null },
+finalPaymentIntentId: { type: String, default: null },
+finalTransactionId: { type: String, default: null },
+finalReceiptUrl: { type: String, default: null },
+
+
 }, { timestamps: true });
 
 module.exports = mongoose.model('Booking', BookingSchema);

@@ -16,24 +16,22 @@ import {
 } from 'lucide-react';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
 import { fetchVendorDetailsForCard } from '../services/vendorsummaryservices.js';
-import{updateVendorActiveStatusAPI } from '../services/vendorService.js';
+import { updateVendorActiveStatusAPI } from '../services/vendorService.js';
 import VendorDashboard from './VendorDashboardAnimated.js';
-// import { useNavigate } from "react-router-dom";
 
-
-
+// --- Types ---
 interface User {
   id: string;
   name: string;
   email: string;
   role: 'customer' | 'vendor';
-
 }
 
 interface TimeSlot {
   id: string;
   time: string;
   isAvailable: boolean;
+  cost?: number; // NEW: per-slot cost
 }
 
 interface ServiceImage {
@@ -71,18 +69,23 @@ const CATEGORIES = [
   'Makeup & Styling'
 ];
 
-export default function ManageServices({ user, onBack, }: ManageServicesProps) {
-
+export default function ManageServices({ user, onBack }: ManageServicesProps) {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     const today = new Date();
-    return today.toISOString().split('T')[0]; // YYYY-MM-DD
+    return today.toISOString().split('T')[0];
   });
 
   // --- Dialog & Form State ---
   const [showServiceDialog, setShowServiceDialog] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
+
+  // Edit dialog state
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editSlots, setEditSlots] = useState<TimeSlot[]>([]);
+  const [editServiceId, setEditServiceId] = useState<string | null>(null);
+
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -98,30 +101,33 @@ export default function ManageServices({ user, onBack, }: ManageServicesProps) {
     if (!user) return;
     try {
       setLoading(true);
-      console.log("Fetching services for user ID:", user);
-      const data = await fetchVendorDetailsForCard(user.id._id, selectedDate);
+      const userId =
+        (user as any).id?._id ??
+        (user as any)?._id ??
+        (user as any)?.id ??
+        (user as any);
 
+      const data = await fetchVendorDetailsForCard(userId, selectedDate);
 
       const mappedServices: Service[] = [
         {
           id: data.id,
           name: data.serviceName,
           description: data.description,
-          category: 'Function Halls', // backend can provide category if available
+          category: 'Function Halls',
           cost: data.minTotalCost,
           advancePayment: data.advancePaymentAmount,
-          images: data.imageUrls.map((url: string, idx: number) => ({ id: `img-${idx}`, url })),
+          images: (data.imageUrls || []).map((url: string, idx: number) => ({ id: `img-${idx}`, url })),
           availableDates: [selectedDate],
-          timeSlots: data.availability.map((slot: any, idx: number) => ({
+          timeSlots: (data.availability || []).map((slot: any, idx: number) => ({
             id: `slot-${idx}`,
             time: slot.time,
-            isAvailable: slot.status === 'available'
+            isAvailable: slot.status === 'available',
+            cost: typeof slot.cost === 'number' ? slot.cost : 0
           })),
           isActive: data.ActiveStatus
         }
       ];
-      console.log("Fetched Data:", data.ActiveStatus);
-      console.log("Mapped Services:", mappedServices);
       setServices(mappedServices);
     } catch (err) {
       console.error('Error fetching vendor services:', err);
@@ -133,6 +139,7 @@ export default function ManageServices({ user, onBack, }: ManageServicesProps) {
 
   useEffect(() => {
     fetchVendorServices();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate]);
 
   // --- Slot & Active Toggles ---
@@ -149,55 +156,85 @@ export default function ManageServices({ user, onBack, }: ManageServicesProps) {
       return service;
     }));
   };
-// const toggleServiceActive = (id: string) => {
-//   setServices(services.map(service => 
-//     service.id === id 
-//       ? { 
-//           ...service, 
-//           isActive: !service.isActive
-//         } 
-//       : service
-//   ));
-//     console.log("Toggled active status for service ID:", services[0].isActive);
-//     console.log("Toggling active status for service ID:", services);
 
-// };
+  const toggleServiceActive = async (id: string) => {
+    const currentService = services.find(service => service.id === id);
+    const newStatus = !currentService?.isActive;
 
-const toggleServiceActive = async (id: string) => {
-  // Find current service
-  const currentService = services.find(service => service.id === id);
-  const newStatus = !currentService?.isActive;
-
-  // Optimistic UI update
-  setServices(prevServices =>
-    prevServices.map(service =>
-      service.id === id
-        ? { ...service, isActive: newStatus }
-        : service
-    )
-  );
-
-  try {
-    // Update backend
-    await updateVendorActiveStatusAPI(id, newStatus);
-    console.log(`✅ Service ID ${id} ActiveStatus updated to ${newStatus}`);
-  } catch (err) {
-    console.error("❌ Failed to update ActiveStatus:", err.message);
-    // Rollback on failure
     setServices(prevServices =>
       prevServices.map(service =>
-        service.id === id
-          ? { ...service, isActive: !currentService?.isActive }
-          : service
+        service.id === id ? { ...service, isActive: newStatus } : service
       )
     );
-  }
-};
+
+    try {
+      await updateVendorActiveStatusAPI(id, newStatus);
+      console.log(`✅ Service ID ${id} ActiveStatus updated to ${newStatus}`);
+    } catch (err: any) {
+      console.error("❌ Failed to update ActiveStatus:", err?.message);
+      setServices(prevServices =>
+        prevServices.map(service =>
+          service.id === id ? { ...service, isActive: !newStatus } : service
+        )
+      );
+    }
+  };
+
+  // --- Edit Handlers ---
+  const openEditDialog = (service: Service) => {
+    setEditServiceId(service.id);
+    setEditSlots(service.timeSlots.map(s => ({ ...s, cost: typeof s.cost === 'number' ? s.cost : 0 })));
+    setShowEditDialog(true);
+  };
+
+  const closeEditDialog = () => {
+    setShowEditDialog(false);
+    setEditServiceId(null);
+    setEditSlots([]);
+  };
+
+  const handleSlotChange = (slotId: string, field: 'time' | 'isAvailable' | 'cost', value: string | boolean | number) => {
+    setEditSlots(prev =>
+      prev.map(slot => (slot.id === slotId ? { ...slot, [field]: value } : slot))
+    );
+  };
+
+  const addNewSlot = () => {
+    const newId = `slot-${Date.now()}`;
+    setEditSlots(prev => [
+      ...prev,
+      { id: newId, time: '09:00 AM - 11:00 AM', isAvailable: true, cost: 0 }
+    ]);
+  };
+
+  const removeSlot = (slotId: string) => {
+    setEditSlots(prev => prev.filter(s => s.id !== slotId));
+  };
+
+  const saveEdits = () => {
+    if (!editServiceId) return;
+
+    for (const s of editSlots) {
+      if (!s.time || s.time.trim().length === 0) {
+        toast.error('Time cannot be empty.');
+        return;
+      }
+      if (typeof s.cost !== 'number' || Number.isNaN(s.cost) || s.cost < 0) {
+        toast.error('Cost must be a non-negative number.');
+        return;
+      }
+    }
+
+    setServices(prev =>
+      prev.map(svc => (svc.id === editServiceId ? { ...svc, timeSlots: [...editSlots] } : svc))
+    );
+
+    toast.success('Service slots updated (local).');
+    closeEditDialog();
+  };
 
   return (
-
     <div className="min-h-screen bg-gradient-to-br from-[var(--royal-cream)] via-white to-[var(--royal-cream)]">
-
       {/* Header */}
       <motion.div
         initial={{ y: -20, opacity: 0 }}
@@ -205,10 +242,14 @@ const toggleServiceActive = async (id: string) => {
         className="bg-gradient-to-r from-[var(--royal-maroon)] via-[var(--royal-copper)] to-[var(--royal-maroon)] text-white shadow-2xl"
       >
         <div className="container mx-auto px-4 py-6 flex items-center justify-between">
-          <Button onClick={(e) => {
-            e.preventDefault();  // prevents page refresh
-            onBack();
-          }} variant="ghost" className="text-white hover:bg-white/20">
+          <Button
+            onClick={(e) => {
+              e.preventDefault();
+              onBack();
+            }}
+            variant="ghost"
+            className="text-white hover:bg-white/20"
+          >
             <ArrowLeft className="h-5 w-5 mr-2" /> Back
           </Button>
           <div className="flex items-center gap-4">
@@ -260,7 +301,6 @@ const toggleServiceActive = async (id: string) => {
                   layout
                 >
                   <Card className="overflow-hidden border-2 border-[var(--royal-gold)]/30 hover:border-[var(--royal-gold)] transition-all shadow-lg hover:shadow-2xl">
-
                     {/* Images */}
                     <div className="relative h-48 bg-gradient-to-br from-[var(--royal-maroon)]/10 to-[var(--royal-gold)]/10">
                       {service.images.length > 0 ? (
@@ -275,17 +315,29 @@ const toggleServiceActive = async (id: string) => {
                         </div>
                       )}
                       <div className="absolute top-2 right-2 flex gap-2">
-                        <Badge
-                          className={service.isActive ? "bg-green-500 text-white" : "bg-gray-400 text-white"}
-                        >
+                        <Badge className={service.isActive ? "bg-green-500 text-white" : "bg-gray-400 text-white"}>
                           {service.isActive ? 'Active' : 'Inactive'}
                         </Badge>
                       </div>
                     </div>
 
                     <CardHeader>
-                      <CardTitle className="text-[var(--royal-maroon)]">{service.name}</CardTitle>
-                      <CardDescription>{service.category}</CardDescription>
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <CardTitle className="text-[var(--royal-maroon)]">{service.name}</CardTitle>
+                          <CardDescription>{service.category}</CardDescription>
+                        </div>
+                        {/* Edit Button */}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-[var(--royal-gold)]/40 hover:bg-[var(--royal-gold)]/10"
+                          onClick={() => openEditDialog(service)}
+                          title="Edit slots & costs"
+                        >
+                          <Edit2 className="h-4 w-4 mr-1" /> Edit
+                        </Button>
+                      </div>
                     </CardHeader>
 
                     <CardContent className="space-y-4">
@@ -315,6 +367,7 @@ const toggleServiceActive = async (id: string) => {
                                 : 'border-gray-300 text-gray-400 bg-gray-50'
                                 }`}
                               onClick={() => toggleSlotAvailability(service.id, slot.id)}
+                              title={typeof slot.cost === 'number' ? `₹${slot.cost}` : undefined}
                             >
                               {slot.isAvailable ? <CheckCircle className="h-3 w-3 mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
                               {slot.time.split(' - ')[0]}
@@ -329,7 +382,6 @@ const toggleServiceActive = async (id: string) => {
                           checked={service.isActive}
                           onCheckedChange={() => toggleServiceActive(service.id)}
                         />
-                        {console.log("Service ID:", service.id, "isActive:", service.isActive)}
                         <span className="text-xs text-gray-600">Active</span>
                       </div>
                     </CardContent>
@@ -340,6 +392,111 @@ const toggleServiceActive = async (id: string) => {
           </div>
         )}
       </div>
+
+      {/* Edit Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={(open) => (open ? setShowEditDialog(true) : closeEditDialog())}>
+        <DialogContent className="sm:max-w-lg w-full p-0 max-h-[85vh] flex flex-col">
+          {/* Header */}
+          <div className="px-6 pt-6 pb-2 border-b border-[var(--royal-gold)]/20 sticky top-0 bg-white z-10">
+            <DialogTitle className="text-[var(--royal-maroon)]">Edit Slots & Costs</DialogTitle>
+            <DialogDescription>Update timings, availability, and per-slot cost.</DialogDescription>
+          </div>
+
+          {/* Controls */}
+          <div className="px-6 py-2">
+            <div className="flex items-center justify-between max-w-[600px] mx-auto w-full">
+              <Label className="text-sm text-gray-700">Slots</Label>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-[var(--royal-gold)]/40 hover:bg-[var(--royal-gold)]/10"
+                onClick={addNewSlot}
+              >
+                <Plus className="h-4 w-4 mr-1" /> Add Slot
+              </Button>
+            </div>
+          </div>
+
+          {/* SCROLL REGION WRAPPER — the key is min-h-0 */}
+          <div className="flex-1 min-h-0">
+            {/* Scrollable list — also needs min-h-0 to allow overflow */}
+            <div className="h-full min-h-0 overflow-y-auto px-6 pt-2 pb-4">
+              <div className="space-y-3 max-w-[600px] mx-auto w-full">
+                {editSlots.length === 0 ? (
+                  <div className="text-sm text-gray-500">No slots. Click “Add Slot” to create one.</div>
+                ) : (
+                  editSlots.map((slot) => (
+                    <div
+                      key={slot.id}
+                      className="grid grid-cols-1 md:grid-cols-12 gap-2 items-center rounded-xl border border-[var(--royal-gold)]/30 p-3 w-full"
+                    >
+                      {/* Time */}
+                      <div className="md:col-span-6">
+                        <Label className="text-xs text-gray-600">Time</Label>
+                        <Input
+                          value={slot.time}
+                          onChange={(e) => handleSlotChange(slot.id, 'time', e.target.value)}
+                          placeholder="e.g., 09:00 AM - 11:00 AM"
+                          className="border-[var(--royal-gold)]/50 focus:border-[var(--royal-gold)] text-sm h-9"
+                        />
+                      </div>
+
+                      {/* Cost */}
+                      <div className="md:col-span-4">
+                        <Label className="text-xs text-gray-600 flex items-center gap-1">
+                          <DollarSign className="h-3 w-3" /> Cost (₹)
+                        </Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          step="100"
+                          value={slot.cost ?? 0}
+                          onChange={(e) => handleSlotChange(slot.id, 'cost', Number(e.target.value))}
+                          className="border-[var(--royal-gold)]/50 focus:border-[var(--royal-gold)] text-sm h-9"
+                        />
+                      </div>
+
+                      {/* Delete to the right of cost */}
+                      <div className="md:col-span-2 flex justify-end items-end">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="hover:bg-red-50 hover:text-red-600"
+                          onClick={() => removeSlot(slot.id)}
+                          title="Remove slot"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="px-6 py-4 border-t border-[var(--royal-gold)]/20 sticky bottom-0 bg-white z-10">
+            <div className="flex justify-end gap-2 max-w-[600px] mx-auto">
+              <Button
+                variant="outline"
+                className="border-[var(--royal-gold)]/40 hover:bg-[var(--royal-gold)]/10"
+                onClick={closeEditDialog}
+              >
+                <X className="h-4 w-4 mr-1" /> Cancel
+              </Button>
+              <Button
+                className="bg-gradient-to-r from-[var(--royal-maroon)] to-[var(--royal-copper)] text-white"
+                onClick={saveEdits}
+              >
+                <Save className="h-4 w-4 mr-1" /> Save Changes
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+
     </div>
   );
 }

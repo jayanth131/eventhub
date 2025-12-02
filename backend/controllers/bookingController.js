@@ -180,95 +180,104 @@ exports.createBooking = async (req, res, next) => {
 // @route   GET /api/bookings/me
 // @access  Private (Customer Only)
 exports.getCustomerBookings = async (req, res, next) => {
-    console.log("fetching customer bookings started")
+    console.log("fetching customer bookings started");
+
     try {
         let query = {};
         let populateVendor = true;
 
-        if (req.user.role === 'customer') {
-            // 📌 Customer — fetch bookings where the user is the customer
+        if (req.user.role === "customer") {
+            // Customer — fetch their bookings
             query = { customer: req.user.id };
-        } else if (req.user.role === 'vendor') {
-            // 📌 Vendor — fetch bookings where the vendor is the profileId (vendorId)
+        } else if (req.user.role === "vendor") {
+            // Vendor — fetch bookings linked to their vendor profile
             query = { vendor: req.user.profileId };
-            populateVendor = false; // vendor already knows their info
+            populateVendor = false;
         } else {
             return res.status(403).json({
                 success: false,
-                message: 'Unauthorized: Only customers or vendors can access bookings.'
+                message: "Unauthorized"
             });
         }
 
-        // console.log("Booking query:", query);
-
-        // 🔸 Fetch bookings
         const bookings = await Booking.find(query)
-            .select('-__v -updatedAt')
+            .select("-__v -updatedAt")
             .populate(
                 populateVendor
                     ? {
-                        path: 'vendor',
-                        select: 'businessName location imageUrls email phone vendor'
-                    }
+                          path: "vendor",
+                          select: "businessName location imageUrls email phone"
+                      }
                     : {
-                        path: 'customer',
-                        select: 'username email phone'
-                    }
+                          path: "customer",
+                          select: "username email phone"
+                      }
             )
-            .sort('-eventDate');
-            // console.log("Raw bookings fetched:", bookings);
+            .sort("-eventDate");
 
-        // 🔸 Transform for frontend
-        const transformed = bookings.map(booking => ({
-            profileId:booking.vendor,
+        // ⭐ UPDATED TRANSFORMER with ALL PAYMENT FIELDS ⭐
+        const transformed = bookings.map((booking) => ({
+            profileId: booking.vendor,
+
             id: booking._id,
             bookingId: booking._id,
-            date: booking.eventDate.toISOString().split('T')[0],
+
+            date: booking.eventDate?.toISOString().split("T")[0] || null,
             time: booking.eventTimeSlot,
+
             total: booking.totalCost,
             paid: booking.advanceAmountPaid,
             balance: booking.remainingBalance,
+
             status: booking.bookingStatus,
+            paymentStatus: booking.paymentStatus,
+
             phone: booking.phone,
-            email: booking.email,    
-            paymentStatus:booking.paymentStatus,
+            email: booking.email,
 
-            ...(req.user.role === 'customer'
+            // ⭐ NEW PAYMENT FIELDS (Advance)
+            advancePaymentIntentId: booking.paymentIntentId || null,
+            advanceTransactionId: booking.stripeTransactionId || null,
+            advanceReceiptUrl: booking.stripeReceiptUrl || null,
+
+            // ⭐ NEW PAYMENT FIELDS (Remaining / Final)
+            finalPaymentIntentId: booking.finalPaymentIntentId || null,
+            finalTransactionId: booking.finalTransactionId || null,
+            finalReceiptUrl: booking.finalReceiptUrl || null,
+
+            ...(req.user.role === "customer"
                 ? {
-                    vendorName: booking.vendor?.businessName || 'N/A',
-                    vendorLocation: booking.vendor?.location || 'N/A',
-                    vendorImage:
-                        booking.vendor?.imageUrls?.[0] ||
-                        'https://placehold.co/800x600/8B0000/FFD700?text=Venue'
-                }
+                      vendorName: booking.vendor?.businessName || "N/A",
+                      vendorLocation: booking.vendor?.location || "N/A",
+                      vendorImage:
+                          booking.vendor?.imageUrls?.[0] ||
+                          "https://placehold.co/800x600/8B0000/FFD700?text=Venue"
+                  }
                 : {
-                    customerName: booking.customer?.username || 'N/A',
-                    customerEmail: booking.customer?.email || 'N/A',
-                    customerPhone: booking.customer?.phone || 'N/A'
-                }),
+                      customerName: booking.customer?.username || "N/A",
+                      customerEmail: booking.customer?.email || "N/A",
+                      customerPhone: booking.customer?.phone || "N/A"
+                  }),
 
-            eventHolderNames: booking.eventHolderNames,
-            eventType: booking.eventType
+            // Event Details
+            eventHolderNames: booking.eventHolderNames || [],
+            eventType: booking.eventType || "N/A"
         }));
-
-        // console.log("Transformed bookings:", transformed);
-        // console.log("customer email:",bookings);
-        // console.log("fetching customer bookings ended")
 
         res.status(200).json({
             success: true,
             count: transformed.length,
             data: transformed
         });
-
     } catch (error) {
         console.error("Error fetching bookings:", error);
         res.status(500).json({
             success: false,
-            message: 'Failed to retrieve booking history.'
+            message: "Failed to retrieve booking history."
         });
     }
 };
+
 
 
 

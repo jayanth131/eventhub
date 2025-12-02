@@ -36,6 +36,8 @@ app.use('/api/bookings', bookingRoutes);
 // All Vendor Dashboard routes start with /api/vendor
 app.use('/api/vendor', vendorDashboardRoutes); // <-- NEW ROUTE MOUNTED
 
+app.use("/api/payments", require("./routes/paymentRoutes"));
+
 app.use('/api/users', userRoutes); // <-- NEW MOUNT POINT
 // === DB Connection Function ===
 const connectDB = async () => {

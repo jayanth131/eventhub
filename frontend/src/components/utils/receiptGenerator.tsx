@@ -12,7 +12,7 @@ export async function generateCombinedReceiptPDF(booking: any, currentUser?: any
     // 🍁 Unified Stripe Transaction ID
     const stripeTxn =
       b.finalTransactionId ||
-      b.stripeTransactionId ||
+      b.advanceTransactionId ||
       b.finalPaymentIntentId ||
       b.paymentIntentId ||
       "N/A";
@@ -117,27 +117,50 @@ export async function generateCombinedReceiptPDF(booking: any, currentUser?: any
     // PAYMENT BREAKDOWN SECTION
     doc.setFontSize(14);
     doc.text("Payment Breakdown", leftX, y);
+// ---- PAYMENT BREAKDOWN (FIXED LAYOUT + FONT) ----
+const fmt = (n: number) => {
+  const cleaned = Number(n || 0);
+  return "Rs. " + cleaned.toLocaleString("en-IN");
+};
 
-    const fmt = (n: number) => "₹" + Number(n || 0).toLocaleString("en-IN");
 
-    y += 10;
+// Bring numbers inside the box
+const valueX = pageWidth - 110;
 
-    doc.setLineWidth(0.5);
-    doc.roundedRect(leftX, y + 10, pageWidth - 80, 130, 8, 8);
+// Ensure clean unicode printing
 
-    doc.setFontSize(12);
-    doc.text("Advance Paid:", leftX + 10, y + 40);
-    doc.text(fmt(b.paid), pageWidth - 50, y + 40, { align: "right" });
 
-    doc.text("Remaining Paid:", leftX + 10, y + 70);
-    doc.text(fmt(b.total - b.paid), pageWidth - 50, y + 70, { align: "right" });
+// Determine text dynamically
+const isFullyPaid = b.paymentStatus === "paid_full";
 
-    doc.text("Total Paid:", leftX + 10, y + 100);
-    doc.setFont("helvetica", "bold");
-    doc.text(fmt(b.total), pageWidth - 50, y + 100, { align: "right" });
+const remainingLabel = isFullyPaid
+  ? "Remaining Paid:"
+  : "Remaining Amount To Be Paid:";
 
-    doc.setFont("helvetica", "normal");
+const remainingValue = isFullyPaid
+  ? b.total - b.paid
+  : b.balance ?? (b.total - b.paid);
 
+const totalLabel = isFullyPaid ? "Total Paid:" : "Total Amount:";
+const totalValue = b.total;
+
+// DRAW BOX
+doc.roundedRect(leftX, y + 10, pageWidth - 80, 130, 8, 8);
+doc.setFontSize(12);
+
+// --- ROW 1: ADVANCE ---
+doc.text("Advance Paid:", leftX + 10, y + 40);
+doc.text(fmt(b.paid), valueX, y + 40, { align: "right" });
+
+// --- ROW 2: REMAINING ---
+doc.text(remainingLabel, leftX + 10, y + 70);
+doc.text(fmt(remainingValue), valueX, y + 70, { align: "right" });
+
+// --- ROW 3: TOTAL ---
+doc.text(totalLabel, leftX + 10, y + 100);
+doc.setFont("helvetica", "bold");
+doc.text(fmt(totalValue), valueX, y + 100, { align: "right" });
+doc.setFont("helvetica", "normal");
     y += 160;
 
     // QR CODE & FOOTER

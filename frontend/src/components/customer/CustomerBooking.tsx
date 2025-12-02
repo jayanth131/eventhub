@@ -845,7 +845,9 @@ const CustomerBooking: React.FC<CustomerBookingProps> = ({
       eventType: eventType === "other" ? customEventType : eventType,
       eventHolderNames,
     }}
-    onSuccess={async () => {
+    onSuccess={async (advancePaymentIntentId) => {
+      // ⬆️ Receive advance payment intent ID from Stripe
+
       toast.loading("Creating booking…");
 
       try {
@@ -861,6 +863,9 @@ const CustomerBooking: React.FC<CustomerBookingProps> = ({
           eventTimeSlot: selectedSlot.time,
           eventType: eventType === "other" ? customEventType : eventType,
           eventHolderNames,
+
+          // ⭐ NEW IMPORTANT FIELD
+          advancePaymentIntentId: advancePaymentIntentId,
         });
 
         toast.dismiss();
@@ -876,6 +881,7 @@ const CustomerBooking: React.FC<CustomerBookingProps> = ({
     }}
   />
 )}
+
 
 
               {bookingStep === 'confirmation' && (

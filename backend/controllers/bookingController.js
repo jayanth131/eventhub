@@ -1,6 +1,8 @@
 const Booking = require('../models/Booking');
 const VendorProfile = require('../models/VendorProfile');
 const mongoose = require('mongoose');
+const Stripe = require("stripe");
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const User = require('../models/User');
 
 
@@ -33,9 +35,9 @@ const normalizeDate = (dateInput) => {
 // @route   POST /api/bookings
 // @access  Private (Customer only)
 exports.createBooking = async (req, res, next) => {
-    const userRole = req.user.role; // 'customer' or 'vendor'
+    const userRole = req.user.role;
     const userId = req.user.id;
-    console.log(req.body)
+    console.log(req.body);
 
     const session = await mongoose.startSession();
     session.startTransaction();
@@ -50,104 +52,143 @@ exports.createBooking = async (req, res, next) => {
         let email;
         let phone;
 
+        // ⭐ STRIPE ADVANCE PAYMENT DETAILS sent from frontend
+        const advancePaymentIntentId = req.body.advancePaymentIntentId || null;
+
+        // Values we will fetch from Stripe
+        let advanceStripeTransactionId = null;
+        let advanceStripeReceiptUrl = null;
+
         if (userRole === 'customer') {
-            // --- Customer Booking ---
             finalVendorId = req.body.vendorId;
             finalCustomerId = userId;
+
             eventType = req.body.eventType;
-            eventHolderNames = req.body.eventHolderNames; // array of names
+            eventHolderNames = req.body.eventHolderNames;
+
             totalCost = req.body.totalCost;
             advanceAmountPaid = req.body.advancePaid;
+
             email = req.body.email;
             phone = req.body.phone;
+
         } else if (userRole === 'vendor') {
-            // --- Vendor Offline Booking for Walk-in Customer ---
             finalVendorId = req.user.profileId;
-            finalCustomerId = req.body.customerId || null; // optional if walk-in
+            finalCustomerId = req.body.customerId || null;
+
             eventType = req.body.eventType;
-            eventHolderNames = req.body.eventHolderNames; // vendor sends customer name
+            eventHolderNames = req.body.eventHolderNames;
+
             totalCost = req.body.totalCost;
-            advanceAmountPaid = req.body.advancePaid;
-            console.log(advanceAmountPaid) // vendor may pay partial/full or 0
+            advanceAmountPaid = req.body.advancePaid || 0;
+
             email = req.body.email || null;
             phone = req.body.phone || null;
+
         } else {
             await session.abortTransaction();
-            return res.status(403).json({ success: false, message: 'Unauthorized user role.' });
+            return res.status(403).json({ success: false, message: "Unauthorized" });
         }
 
-        // --- Find Vendor ---
+        // ⭐ If customer advance payment happened → fetch details from Stripe
+        if (advancePaymentIntentId) {
+            const paymentIntent = await stripe.paymentIntents.retrieve(advancePaymentIntentId);
+            const charge = paymentIntent.charges?.data?.[0];
+
+            advanceStripeTransactionId = paymentIntent.latest_charge || null;
+            advanceStripeReceiptUrl = charge?.receipt_url || null;
+        }
+
+        // Load vendor
         const vendor = await VendorProfile.findById(finalVendorId)
-            .select('category availability advancePaymentAmount')
+            .select("category availability")
             .session(session);
 
         if (!vendor) {
             await session.abortTransaction();
-            return res.status(404).json({ success: false, message: 'Vendor not found.' });
+            return res.status(404).json({ success: false, message: "Vendor not found." });
         }
 
         const requestedDate = normalizeDate(req.body.eventDate);
         let isSlotAvailable = true;
 
-        const dayEntry = vendor.availability.find(item => normalizeDate(item.date).getTime() === requestedDate.getTime());
+        const dayEntry = vendor.availability.find(
+            (item) => normalizeDate(item.date).getTime() === requestedDate.getTime()
+        );
+
         if (dayEntry) {
-            const slot = dayEntry.slots.find(s => s.time === req.body.eventTimeSlot);
-            if (slot && slot.status !== 'available') {
+            const slot = dayEntry.slots.find((s) => s.time === req.body.eventTimeSlot);
+            if (slot && slot.status !== "available") {
                 isSlotAvailable = false;
             }
         }
 
         if (!isSlotAvailable) {
             await session.abortTransaction();
-            return res.status(400).json({ success: false, message: 'Requested slot is already booked or unavailable.' });
+            return res.status(400).json({
+                success: false,
+                message: "Requested slot is already booked or unavailable.",
+            });
         }
 
         // --- Payment & Booking Status ---
-        let paymentStatus = 'paid_advance';
-        let bookingStatus = 'confirmed';
+        let paymentStatus = "paid_advance";
+        let bookingStatus = "confirmed";
 
-        if (userRole === 'vendor') {
-            // Offline vendor booking → manual
-            paymentStatus = 'manual';
-
-            bookingStatus = 'confirmed';
-            if (!advanceAmountPaid) advanceAmountPaid = 0;
+        if (userRole === "vendor") {
+            paymentStatus = "manual";
+            bookingStatus = "confirmed";
         }
 
         const remainingBalance = totalCost - advanceAmountPaid;
 
-        // --- Create Booking ---
-        const newBooking = await Booking.create([{
-            customer: finalCustomerId,
-            vendor: finalVendorId,
-            serviceCategory: vendor.category,
-            eventType,
-            eventHolderNames,
-            vendorName: req.body.vendorName || vendor.name,
-            vendorLocation: req.body.vendorLocation || "",
-            email,
-            phone,
-            eventDate: requestedDate,
-            eventTimeSlot: req.body.eventTimeSlot,
-            totalCost,
-            advanceAmountPaid,
-            remainingBalance,
-            paymentStatus,
-            bookingStatus
-        }], { session });
+        // ⭐ CREATE BOOKING + STORE ADVANCE PAYMENT DATA
+        const newBooking = await Booking.create(
+            [
+                {
+                    customer: finalCustomerId,
+                    vendor: finalVendorId,
+                    serviceCategory: vendor.category,
+
+                    eventType,
+                    eventHolderNames,
+                    vendorName: req.body.vendorName || vendor.businessName,
+                    vendorLocation: req.body.vendorLocation || "",
+
+                    email,
+                    phone,
+
+                    eventDate: requestedDate,
+                    eventTimeSlot: req.body.eventTimeSlot,
+
+                    totalCost,
+                    advanceAmountPaid,
+                    remainingBalance,
+
+                    paymentStatus,
+                    bookingStatus,
+
+                    // ⭐ Store Stripe Advance Payment
+                    paymentIntentId: advancePaymentIntentId,
+                    stripeTransactionId: advanceStripeTransactionId,
+                    stripeReceiptUrl: advanceStripeReceiptUrl
+                },
+            ],
+            { session }
+        );
 
         // --- Update Vendor Availability ---
         if (!dayEntry) {
             vendor.availability.push({
                 date: requestedDate,
-                slots: [{ time: req.body.eventTimeSlot, status: 'booked' }]
+                slots: [{ time: req.body.eventTimeSlot, status: "booked" }],
             });
         } else {
-            const slot = dayEntry.slots.find(s => s.time === req.body.eventTimeSlot);
+            const slot = dayEntry.slots.find((s) => s.time === req.body.eventTimeSlot);
             if (slot) {
-                slot.status = 'booked';
+                slot.status = "booked";
             } else {
-                dayEntry.slots.push({ time: req.body.eventTimeSlot, status: 'booked' });
+                dayEntry.slots.push({ time: req.body.eventTimeSlot, status: "booked" });
             }
         }
 
@@ -155,26 +196,26 @@ exports.createBooking = async (req, res, next) => {
 
         await session.commitTransaction();
         session.endSession();
-        // console.log('New Booking Created:', newBooking[0]);
 
         res.status(201).json({
             success: true,
-            message: userRole === 'vendor'
-                ? 'Offline booking successfully created!'
-                : 'Booking successfully confirmed! Check your dashboard.',
-            data: newBooking[0]
+            message:
+                userRole === "vendor"
+                    ? "Offline booking successfully created!"
+                    : "Booking successfully confirmed!",
+            data: newBooking[0],
         });
-
     } catch (error) {
         await session.abortTransaction();
         session.endSession();
-        console.error('Booking Creation Error:', error);
+        console.error("Booking Creation Error:", error);
         res.status(500).json({
             success: false,
-            message: 'Failed to create booking: ' + error.message
+            message: "Failed to create booking: " + error.message,
         });
     }
 };
+
 // --- NEW FUNCTION TO BE ADDED ---
 // @desc    Get all bookings for the authenticated customer
 // @route   GET /api/bookings/me

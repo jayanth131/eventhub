@@ -14,7 +14,7 @@ const StripePaymentComponent = ({ amount, bookingPayload, onSuccess }) => {
     toast.loading("Processing secure payment…");
 
     try {
-      // 1️⃣ Call backend to create payment intent
+      // 1️⃣ Create Payment Intent (advance)
       const res = await fetch("http://localhost:5000/api/payments/create-intent", {
         method: "POST",
         headers: {
@@ -24,7 +24,7 @@ const StripePaymentComponent = ({ amount, bookingPayload, onSuccess }) => {
         body: JSON.stringify({
           totalCost: amount,
           vendorId: bookingPayload.vendorId,
-          advancePaid:bookingPayload.advancePaid,
+          advancePaid: bookingPayload.advancePaid,
         }),
       });
 
@@ -33,7 +33,7 @@ const StripePaymentComponent = ({ amount, bookingPayload, onSuccess }) => {
 
       const clientSecret = data.clientSecret;
 
-      // 2️⃣ Confirm payment
+      // 2️⃣ Confirm Payment
       const result = await stripe.confirmCardPayment(clientSecret, {
         payment_method: {
           card: elements.getElement(CardElement),
@@ -48,25 +48,15 @@ const StripePaymentComponent = ({ amount, bookingPayload, onSuccess }) => {
       }
 
       if (result.paymentIntent.status === "succeeded") {
-  toast.dismiss();
-  toast.success("Advance payment successful!");
+        toast.dismiss();
+        toast.success("Advance payment successful!");
 
-  // ⭐ Save advance payment to backend
-  await fetch("http://localhost:5000/api/payments/save-advance", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-    },
-    body: JSON.stringify({
-      bookingId: bookingPayload.vendorId,
-      paymentIntentId: result.paymentIntent.id,
-    }),
-  });
+        // ⭐ DO NOT SEND TO BACKEND HERE
+        // Because booking DOES NOT exist yet!
 
-  // trigger booking creation
-  onSuccess();
-}
+        // 3️⃣ Instead, return paymentIntentId to parent
+        onSuccess(result.paymentIntent.id);
+      }
 
     } catch (err) {
       toast.dismiss();

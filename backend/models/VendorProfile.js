@@ -44,6 +44,19 @@ const VendorProfileSchema = new mongoose.Schema({
         type: Boolean, 
         default: true 
     },
+    approvalStatus: {
+  type: String,
+  enum: ["pending", "approved", "rejected"],
+  default: "pending",
+  requried:false,
+},
+isApproved: {
+  type: Boolean,
+  default: false,
+  required:false
+}
+,
+
     // KEPT: Fixed advance payment amount (number)
     advancePaymentAmount: { 
         type: Number, 

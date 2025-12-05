@@ -5,6 +5,7 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Calendar } from '../ui/calendar';
+import { Upload as UploadIcon } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Switch } from '../ui/switch';
@@ -16,7 +17,7 @@ import {
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 // import ManualBooking from './ManualBooking';
 import { toast } from 'sonner@2.0.3';
-import { fetchVendorDashboardSummary, fetchCustomerBookings, submitBooking, cancelBookingAPI } from '../services/vendorsummaryservices.js';
+import { fetchVendorDashboardSummary, fetchCustomerBookings, submitBooking, cancelBookingAPI,fetchVendorImages,uploadVendorProfilePhoto } from '../services/vendorsummaryservices.js';
 import RevenueDetails from './RevenueDetails';
 import BookingsDetails from './BookingsDetails';
 import AdvancePaymentDetails from './AdvancePaymentDetails';
@@ -36,6 +37,7 @@ interface Booking {
   status: 'confirmed' | 'pending' | 'completed' | 'cancelled';
   paymentStatus: 'pending' | 'paid_advance' | 'paid_full' | 'failed' | 'manual'
   advancePaid: number;
+
 }
 
 interface TimeSlot {
@@ -60,6 +62,8 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
   const [expandedBookingId, setExpandedBookingId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<'dashboard' | 'revenue' | 'bookings' | 'advance' | 'todaysEvents'>('dashboard');
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
+  const [profilePhoto, setProfilePhoto] = useState(null);
+
 
   // ✅ Fetch dashboard & bookings from backend
   useEffect(() => {
@@ -87,6 +91,40 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
     };
     loadDashboardData();
   }, []);
+
+  useEffect(() => {
+  const loadImages = async () => {
+    const res = await fetchVendorImages(profileId);
+    if (res.success) {
+      setProfilePhoto(res.images[0]); // first img
+    }
+  };
+
+  loadImages();
+}, [profileId]);
+
+
+console.log("profile photo url: ",profilePhoto);
+
+const handlePhotoUpload = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  toast.loading("Uploading profile photo...");
+
+  const res = await uploadVendorProfilePhoto(file);
+
+  toast.dismiss();
+
+  if (res.success) {
+    toast.success("Profile photo updated!");
+    setProfilePhoto(`http://localhost:5000${res.imageUrl}`);
+  } else {
+    toast.error(res.message || "Upload failed");
+  }
+};
+
+
 
   // ✅ Add new booking (integrated with backend)
   const handleAddBooking = async (newBooking: Booking) => {
@@ -521,25 +559,38 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
 
           <TabsContent value="profile" className="space-y-6">
             <Card className="border-4 border-[var(--royal-gold)]/30 shadow-xl bg-white">
-              <CardHeader>
-                <CardTitle className="text-[var(--royal-maroon)] flex items-center">
-                  {/* <Crown className="h-6 w-6 mr-2 text-[var(--royal-gold)]" />
-                   */}
-                  {/* <img src={bookings.} alt="" /> */}
-                  Royal Vendor Profile
-                </CardTitle>
-                <CardDescription>Your premium Event service details</CardDescription>
-              </CardHeader>
+<div className="flex flex-col items-center">
+  <div className="relative">
+    <img
+      src={profilePhoto}
+      className="w-24 h-24 rounded-full object-cover border-4 border-[var(--royal-gold)] shadow-lg"
+    />
+
+    {/* Upload button overlay */}
+    <label className="absolute bottom-0 right-0 bg-[var(--royal-gold)] text-white p-1 rounded-full cursor-pointer">
+      <input
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handlePhotoUpload}
+      />
+      <UploadIcon size={16} />
+    </label>
+  </div>
+</div>
+
+
+
               <CardContent className="space-y-6">
                 {/* Avatar & Info */}
                 <div className="flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-6">
-                  <motion.div
+                  {/* <motion.div
                     whileHover={{ scale: 1.1, rotate: 360 }}
                     transition={{ duration: 0.6 }}
                     className="w-24 h-24 rounded-full bg-gradient-to-r from-[var(--royal-maroon)] to-[var(--royal-copper)] flex items-center justify-center"
                   >
                     <Crown className="h-12 w-12 text-[var(--royal-gold)] fill-current" />
-                  </motion.div>
+                  </motion.div> */}
                   <div>
                     <h3 className="text-2xl text-[var(--royal-maroon)]">{user.name}</h3>
                     <p className="text-gray-600">{user.email}</p>
@@ -557,27 +608,16 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
                   <div>
                     <p className="text-sm text-gray-600 mb-1">Total Events</p>
                     <p className="text-2xl text-[var(--royal-maroon)]">
-                      <AnimatedCounter value={156} />
+                      <AnimatedCounter value={dashboardData.totalBookingsCount} />
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600 mb-1">Years Experience</p>
                     <p className="text-2xl text-[var(--royal-maroon)]">
-                      <AnimatedCounter value={8} />
+                      <AnimatedCounter value={2} />
                     </p>
                   </div>
-                  {/* <div>
-                    <p className="text-sm text-gray-600 mb-1">Customer Satisfaction</p>
-                    <p className="text-2xl text-[var(--royal-maroon)]">
-                      <AnimatedCounter value={98} suffix="%" />
-                    </p>
-                  </div> */}
-                  {/* <div>
-                    <p className="text-sm text-gray-600 mb-1">Repeat Customers</p>
-                    <p className="text-2xl text-[var(--royal-maroon)]">
-                      <AnimatedCounter value={45} suffix="%" />
-                    </p>
-                  </div> */}
+                  
                 </div>
               </CardContent>
             </Card>

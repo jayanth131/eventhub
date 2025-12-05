@@ -223,3 +223,19 @@ html {
     scrollbar-color: var(--royal-gold) var(--royal-cream);
   }
 }
+
+/* FIX RADIX DIALOG SCROLLING */
+div[role="dialog"] {
+  display: flex !important;
+  flex-direction: column !important;
+  max-height: 85vh !important;
+  overflow: hidden !important;
+}
+
+/* body inside dialog must scroll */
+.dialog-body-scrollable {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+}

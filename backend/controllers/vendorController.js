@@ -5,7 +5,8 @@ const User = require('../models/User'); // Required for population
 const CustomerProfile = require('../models/CustomerProfile'); // Required for global model registration
 const bcrypt = require('bcryptjs'); // Required for global model registration
 const jwt = require('jsonwebtoken'); // Required for global model registration
-
+const multer = require("multer");
+const upload = multer({ dest: "uploads/" });
 
 // --- Helper function for date normalization ---
 const normalizeDate = (date) => {
@@ -17,7 +18,8 @@ const normalizeDate = (date) => {
 
 
 // ===========================================
-// VENDOR DISCOVERY (List View - Public & Fast)
+// VENDOR DISCOV
+// ERY (List View - Public & Fast)
 // ===========================================
 
 // @desc    Search and filter vendors (Returns minimal data for card list)
@@ -453,5 +455,106 @@ exports.updateVendorActiveStatus = async (req, res) => {
   } catch (error) {
     console.error('Error updating ActiveStatus:', error);
     res.status(500).json({ message: 'Server error', error });
+  }
+};
+exports.updateVendorSlots = async (req, res) => {
+  try {
+    const { vendorId, slots } = req.body;
+
+    if (!vendorId || !Array.isArray(slots)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid data",
+      });
+    }
+
+    const vendor = await VendorProfile.findById(vendorId);
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: "Vendor not found",
+      });
+    }
+
+    // Replace standardSlots fully
+    vendor.standardSlots = slots.map((s) => ({
+      time: s.time,
+      price: s.cost,
+      status: "available", // constant
+    }));
+
+    await vendor.save();
+
+    return res.json({
+      success: true,
+      message: "Standard slots updated successfully",
+      slots: vendor.standardSlots,
+    });
+  } catch (err) {
+    console.error("Error updating slots:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
+
+
+exports.getVendorImages = async (req, res) => {
+  try {
+    const vendor = await VendorProfile.findById(req.params.vendorId)
+      .select("imageUrls");
+
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: "Vendor not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      images: vendor.imageUrls,
+    });
+
+  } catch (err) {
+    console.error("Error fetching vendor images:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+
+exports.updateProfilePhoto = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.json({ success: false, message: "No file uploaded" });
+    }
+
+    const vendorId = req.user.profileId;
+
+    const vendor = await VendorProfile.findById(vendorId);
+
+    if (!vendor) {
+      return res.status(404).json({ success: false, message: "Vendor not found" });
+    }
+
+    // Create full URL so frontend can access file
+    const fullUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+
+    // Replace DP image (imageUrls[0])
+    vendor.imageUrls[0] = fullUrl;
+
+    await vendor.save();
+
+    return res.json({
+      success: true,
+      message: "Profile photo updated successfully",
+      url: fullUrl,
+    });
+
+  } catch (err) {
+    console.error("Profile photo update failed:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };

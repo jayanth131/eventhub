@@ -18,6 +18,8 @@ import { ImageWithFallback } from '../figma/ImageWithFallback';
 import { fetchVendorDetailsForCard } from '../services/vendorsummaryservices.js';
 import { updateVendorActiveStatusAPI } from '../services/vendorService.js';
 import VendorDashboard from './VendorDashboardAnimated.js';
+import { updateVendorSlotsAPI } from "../services/vendorService.js";
+
 
 // --- Types ---
 interface User {
@@ -211,27 +213,61 @@ export default function ManageServices({ user, onBack }: ManageServicesProps) {
     setEditSlots(prev => prev.filter(s => s.id !== slotId));
   };
 
-  const saveEdits = () => {
-    if (!editServiceId) return;
+  const saveEdits = async () => {
+  if (!editServiceId) return;
 
-    for (const s of editSlots) {
-      if (!s.time || s.time.trim().length === 0) {
-        toast.error('Time cannot be empty.');
-        return;
-      }
-      if (typeof s.cost !== 'number' || Number.isNaN(s.cost) || s.cost < 0) {
-        toast.error('Cost must be a non-negative number.');
-        return;
-      }
+  // 1️⃣ Validate slots
+  for (const s of editSlots) {
+    if (!s.time || s.time.trim().length === 0) {
+      toast.error('Time cannot be empty.');
+      return;
     }
+    if (typeof s.cost !== "number" || isNaN(s.cost) || s.cost < 0) {
+      toast.error('Cost must be a non-negative number.');
+      return;
+    }
+  }
 
-    setServices(prev =>
-      prev.map(svc => (svc.id === editServiceId ? { ...svc, timeSlots: [...editSlots] } : svc))
+  try {
+    toast.loading("Updating slots…");
+
+    // 2️⃣ Call backend API
+    const response = await updateVendorSlotsAPI(
+      editServiceId,            // vendorId
+      editSlots,                // array of slots
+      selectedDate              // selected date
     );
 
-    toast.success('Service slots updated (local).');
+    toast.dismiss();
+
+    if (!response.success) {
+      toast.error(response.message || "Failed to update slots");
+      return;
+    }
+
+    toast.success("Slots updated successfully! 🔥");
+
+    // 3️⃣ Update UI instantly (local state)
+    setServices(prev =>
+      prev.map(svc =>
+        svc.id === editServiceId
+          ? { ...svc, timeSlots: [...editSlots] }
+          : svc
+      )
+    );
+
+    // 4️⃣ Close modal
     closeEditDialog();
-  };
+
+    // 5️⃣ Optional: Re-fetch from backend
+    fetchVendorServices();
+
+  } catch (err) {
+    toast.dismiss();
+    toast.error("Server error: " + err.message);
+    console.error("Slot update error:", err);
+  }
+};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[var(--royal-cream)] via-white to-[var(--royal-cream)]">
@@ -394,109 +430,108 @@ export default function ManageServices({ user, onBack }: ManageServicesProps) {
       </div>
 
       {/* Edit Dialog */}
-      <Dialog open={showEditDialog} onOpenChange={(open) => (open ? setShowEditDialog(true) : closeEditDialog())}>
-        <DialogContent className="sm:max-w-lg w-full p-0 max-h-[85vh] flex flex-col">
-          {/* Header */}
-          <div className="px-6 pt-6 pb-2 border-b border-[var(--royal-gold)]/20 sticky top-0 bg-white z-10">
-            <DialogTitle className="text-[var(--royal-maroon)]">Edit Slots & Costs</DialogTitle>
-            <DialogDescription>Update timings, availability, and per-slot cost.</DialogDescription>
-          </div>
+      {/* Edit Dialog */}
+<Dialog open={showEditDialog} onOpenChange={(open) => (open ? setShowEditDialog(true) : closeEditDialog())}>
+  {/* NOTE: Give the DialogContent a predictable classname that matches CSS above */}
+<DialogContent
+  className="sm:max-w-lg w-full p-0 max-h-[85vh] flex flex-col !overflow-visible">
+    {/* Header (fixed) */}
+    <div className="px-6 pt-6 pb-3 border-b border-[var(--royal-gold)]/30 bg-white z-10">
+      <DialogTitle className="text-[var(--royal-maroon)]">Edit Slots & Costs</DialogTitle>
+      <DialogDescription>Update timings, availability, and per-slot cost.</DialogDescription>
+    </div>
 
-          {/* Controls */}
-          <div className="px-6 py-2">
-            <div className="flex items-center justify-between max-w-[600px] mx-auto w-full">
-              <Label className="text-sm text-gray-700">Slots</Label>
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-[var(--royal-gold)]/40 hover:bg-[var(--royal-gold)]/10"
-                onClick={addNewSlot}
-              >
-                <Plus className="h-4 w-4 mr-1" /> Add Slot
-              </Button>
-            </div>
-          </div>
+    {/* Top Controls (fixed) */}
+    <div className="px-6 py-3 border-b border-[var(--royal-gold)]/20 bg-white z-10">
+      <div className="flex items-center justify-between max-w-[600px] mx-auto w-full">
+        <Label className="text-sm text-gray-700">Slots</Label>
+        <Button
+          variant="outline"
+          size="sm"
+          className="border-[var(--royal-gold)]/40 hover:bg-[var(--royal-gold)]/10"
+          onClick={addNewSlot}
+        >
+          <Plus className="h-4 w-4 mr-1" /> Add Slot
+        </Button>
+      </div>
+    </div>
 
-          {/* SCROLL REGION WRAPPER — the key is min-h-0 */}
-          <div className="flex-1 min-h-0">
-            {/* Scrollable list — also needs min-h-0 to allow overflow */}
-            <div className="h-full min-h-0 overflow-y-auto px-6 pt-2 pb-4">
-              <div className="space-y-3 max-w-[600px] mx-auto w-full">
-                {editSlots.length === 0 ? (
-                  <div className="text-sm text-gray-500">No slots. Click “Add Slot” to create one.</div>
-                ) : (
-                  editSlots.map((slot) => (
-                    <div
-                      key={slot.id}
-                      className="grid grid-cols-1 md:grid-cols-12 gap-2 items-center rounded-xl border border-[var(--royal-gold)]/30 p-3 w-full"
-                    >
-                      {/* Time */}
-                      <div className="md:col-span-6">
-                        <Label className="text-xs text-gray-600">Time</Label>
-                        <Input
-                          value={slot.time}
-                          onChange={(e) => handleSlotChange(slot.id, 'time', e.target.value)}
-                          placeholder="e.g., 09:00 AM - 11:00 AM"
-                          className="border-[var(--royal-gold)]/50 focus:border-[var(--royal-gold)] text-sm h-9"
-                        />
-                      </div>
+    {/* Scrollable Body (flex-1, min-h-0, overflow-auto) */}
+    <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 bg-white dialog-body-scrollable scrollbar-thin">
+      <div className="space-y-3 max-w-[600px] mx-auto w-full">
+        {editSlots.length === 0 ? (
+          <div className="text-sm text-gray-500">No slots. Click “Add Slot” to create one.</div>
+        ) : (
+          editSlots.map((slot) => (
+            <div
+              key={slot.id}
+              className="grid grid-cols-1 md:grid-cols-12 gap-2 items-center rounded-xl border border-[var(--royal-gold)]/30 p-3 bg-white"
+            >
+              {/* Time */}
+              <div className="md:col-span-6">
+                <Label className="text-xs text-gray-600">Time</Label>
+                <Input
+                  value={slot.time}
+                  onChange={(e) => handleSlotChange(slot.id, 'time', e.target.value)}
+                  placeholder="09:00 AM - 11:00 AM"
+                  className="border-[var(--royal-gold)]/50 focus:border-[var(--royal-gold)] text-sm h-9"
+                />
+              </div>
 
-                      {/* Cost */}
-                      <div className="md:col-span-4">
-                        <Label className="text-xs text-gray-600 flex items-center gap-1">
-                          <DollarSign className="h-3 w-3" /> Cost (₹)
-                        </Label>
-                        <Input
-                          type="number"
-                          min={0}
-                          step="100"
-                          value={slot.cost ?? 0}
-                          onChange={(e) => handleSlotChange(slot.id, 'cost', Number(e.target.value))}
-                          className="border-[var(--royal-gold)]/50 focus:border-[var(--royal-gold)] text-sm h-9"
-                        />
-                      </div>
+              {/* Cost */}
+              <div className="md:col-span-4">
+                <Label className="text-xs text-gray-600 flex items-center gap-1">
+                  <DollarSign className="h-3 w-3" /> Cost (₹)
+                </Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step={100}
+                  value={slot.cost ?? 0}
+                  onChange={(e) => handleSlotChange(slot.id, 'cost', Number(e.target.value))}
+                  className="border-[var(--royal-gold)]/50 focus:border-[var(--royal-gold)] text-sm h-9"
+                />
+              </div>
 
-                      {/* Delete to the right of cost */}
-                      <div className="md:col-span-2 flex justify-end items-end">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="hover:bg-red-50 hover:text-red-600"
-                          onClick={() => removeSlot(slot.id)}
-                          title="Remove slot"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))
-                )}
+              {/* Delete */}
+              <div className="md:col-span-2 flex justify-end items-end">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="hover:bg-red-50 hover:text-red-600"
+                  onClick={() => removeSlot(slot.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </div>
             </div>
-          </div>
-
-          {/* Footer */}
-          <div className="px-6 py-4 border-t border-[var(--royal-gold)]/20 sticky bottom-0 bg-white z-10">
-            <div className="flex justify-end gap-2 max-w-[600px] mx-auto">
-              <Button
-                variant="outline"
-                className="border-[var(--royal-gold)]/40 hover:bg-[var(--royal-gold)]/10"
-                onClick={closeEditDialog}
-              >
-                <X className="h-4 w-4 mr-1" /> Cancel
-              </Button>
-              <Button
-                className="bg-gradient-to-r from-[var(--royal-maroon)] to-[var(--royal-copper)] text-white"
-                onClick={saveEdits}
-              >
-                <Save className="h-4 w-4 mr-1" /> Save Changes
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-
+          ))
+        )}
+      </div>
     </div>
+
+    {/* Footer (Fixed at bottom) */}
+    <div className="px-6 py-4 border-t border-[var(--royal-gold)]/20 bg-white flex justify-end gap-2 z-10">
+      <Button
+        variant="outline"
+        className="border-[var(--royal-gold)]/40 hover:bg-[var(--royal-gold)]/10"
+        onClick={closeEditDialog}
+      >
+        <X className="h-4 w-4 mr-1" /> Cancel
+      </Button>
+
+      <Button
+        className="bg-gradient-to-r from-[var(--royal-maroon)] to-[var(--royal-copper)] text-white"
+        onClick={saveEdits}
+      >
+        <Save className="h-4 w-4 mr-1" /> Save Changes
+      </Button>
+    </div>
+  </DialogContent>
+</Dialog>
+
+
+
+  </div>
   );
 }

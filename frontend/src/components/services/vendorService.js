@@ -108,3 +108,18 @@ export const updateVendorActiveStatusAPI = async (vendorId, newStatus) => {
     const response = await fetchAuthenticated(endpoint, 'PUT', body);
     return response; // returns updated vendor object
 };
+
+export const updateVendorSlotsAPI = async (vendorId, slots, date) => {
+  const token = localStorage.getItem("authToken");
+
+  const res = await fetch(`http://localhost:5000/api/vendor/update-slots`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ vendorId, slots, date })
+  });
+
+  return res.json();
+};

@@ -115,3 +115,26 @@ export const markBookingAsCompleted = async (bookingId) => {
   return response.data; // returns updated booking object
 };
 
+export const fetchVendorImages = async (vendorId) => {
+  const res = await fetch(`http://localhost:5000/api/vendor/${vendorId}/images`);
+  return res.json();
+};
+
+
+export const uploadVendorProfilePhoto = async (file) => {
+  const token = localStorage.getItem("authToken");
+
+  const formData = new FormData();
+  formData.append("photo", file);
+
+  const res = await fetch("http://localhost:5000/api/vendor/upload-profile-photo", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`
+      // ❌ DO NOT SET Content-Type (browser sets automatically for FormData)
+    },
+    body: formData
+  });
+
+  return res.json();
+};

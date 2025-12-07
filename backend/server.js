@@ -5,66 +5,61 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 
-// --- Import Routes ---
+const path = require("path");
+
+// Import Routes
 const authRoutes = require('./routes/auth');
-const vendorRoutes = require('./routes/vendors'); 
+const vendorRoutes = require('./routes/vendors');
 const bookingRoutes = require('./routes/bookings');
-const vendorDashboardRoutes = require('./routes/vendorDashboard'); // <-- NEW IMPORT ADDED
-const userRoutes = require('./routes/users'); // <-- NEW IMPORT
+const vendorDashboardRoutes = require('./routes/vendorDashboard');
+const userRoutes = require('./routes/users');
+const adminRoutes = require('./routes/admin');   // ✅ NEW
+
 require('./models/CustomerProfile');
 require('./models/VendorProfile');
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI;
 
-// === Middleware ===
+// Middleware
 app.use(cors());
-app.use(express.json()); 
+app.use(express.json());
 
-
-
-const path = require("path");
-
-// Serve uploaded images globally
+// Serve uploaded images
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-
-// === Initial Routes ===
+// Initial Route
 app.get('/', (req, res) => {
     res.send('Wedding Booking API is Running!');
 });
 
-// === Mount Routers ===
-// All Authentication routes start with /api/auth
-app.use('/api/auth', authRoutes); 
-// All Vendor Discovery routes start with /api/vendors
-app.use('/api/vendors', vendorRoutes); 
-// All Booking routes start with /api/bookings
-app.use('/api/bookings', bookingRoutes); 
-// All Vendor Dashboard routes start with /api/vendor
-app.use('/api/vendor', vendorDashboardRoutes); // <-- NEW ROUTE MOUNTED
-
+// Mount Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/vendors', vendorRoutes);
+app.use('/api/bookings', bookingRoutes);
+app.use('/api/vendor', vendorDashboardRoutes);
 app.use("/api/payments", require("./routes/paymentRoutes"));
+app.use('/api/users', userRoutes);
+app.use('/api/admin', adminRoutes);  // ✅ ADMIN ROUTES ADDED
 
-app.use('/api/users', userRoutes); // <-- NEW MOUNT POINT
-// === DB Connection Function ===
+// Database Connection
 const connectDB = async () => {
     try {
         await mongoose.connect(MONGO_URI);
         console.log('MongoDB Atlas Connected Successfully!');
     } catch (err) {
         console.error('MongoDB connection failed:', err.message);
-        process.exit(1); 
+        process.exit(1);
     }
 };
 
-// === Start Server Function ===
+// Start Server
 const startServer = async () => {
-    await connectDB(); // Ensure DB is connected before listening
+    await connectDB();
     app.listen(PORT, () => {
         console.log(`Server is running on port ${PORT}`);
     });
 };
 
-// Start the application
 startServer();

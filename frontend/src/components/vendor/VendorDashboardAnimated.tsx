@@ -63,7 +63,8 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
   const [currentView, setCurrentView] = useState<'dashboard' | 'revenue' | 'bookings' | 'advance' | 'todaysEvents'>('dashboard');
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [profilePhoto, setProfilePhoto] = useState(null);
-
+  
+  
 
   // ✅ Fetch dashboard & bookings from backend
   useEffect(() => {
@@ -78,8 +79,9 @@ export default function VendorDashboard({ user, onLogout, onNavigateToManageServ
         setBookings(bookingList);
         setProfileId(bookingList[0].profileId);
         // console.log('Fetched Dashboard Data:', summary);
-        // console.log('Fetched profileid:', profileId);
-        console.log('Fetched overall:', bookings);
+        console.log('Fetched profileid:', bookingList[0].profileId);
+        console.log('Fetched overall:', bookingList);
+        user.id = bookingList[0].profileId;
 
         // console.log("bookings:",bookings)
       } catch (error) {

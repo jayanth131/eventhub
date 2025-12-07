@@ -24,7 +24,7 @@ const UserSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-       enum: ['customer', 'vendor'], 
+       enum: ['customer', 'vendor','admin'], 
         default: 'customer',
         required: true,
     },
@@ -35,8 +35,11 @@ const UserSchema = new mongoose.Schema({
     },
     roleRef: { // <-- NEW FIELD to hold the actual model name for Mongoose
         type: String,
-        required: true,
-        enum: ['CustomerProfile', 'VendorProfile']
+        required: function () {
+      return this.role !== "admin";   // required only for vendor & customer
+    },
+        enum: ['CustomerProfile', 'VendorProfile',null],
+        default:null
     }
 }, { timestamps: true });
 

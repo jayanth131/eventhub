@@ -57,31 +57,52 @@ exports.registerCustomer = async (req, res, next) => {
 // @route   POST /api/auth/signup/vendor
 // @access  Public
 exports.registerVendor = async (req, res, next) => {
-    const { username, email, password, businessName, category,phone, location, roleRef } = req.body; 
+    const { 
+        username, 
+        email, 
+        password, 
+        businessName, 
+        category, 
+        phone, 
+        location, 
+        roleRef 
+    } = req.body; 
 
     try {
-        const user = new User({ username, email, password, role: 'vendor', roleRef });
-        await user.save(); // Saves user and hashes password
+        // 1️⃣ Create User with role "vendor"
+        const user = new User({ 
+            username, 
+            email, 
+            password, 
+            role: 'vendor', 
+            roleRef 
+        });
 
-        // 2. Create the Vendor Profile (Updated to reflect new fields)
+        await user.save();
+
+        // 2️⃣ Create Vendor Profile with new approval fields
         const vendorProfile = await VendorProfile.create({
             userId: user._id,
             businessName,
             email,
             category,
             location,
-            phone, // New required field
-            // New fields will default to 0 and 5000 if not provided in signup payload.
-            // If you wanted to set initial values:
+            phone,
+
+            // NEW FIELDS ADDED HERE
+            approvalStatus: "pending",
+            isApproved: false,
+
+            // You may add default pricing fields later if needed
             // totalCost: req.body.totalCost || 0,
-            // advancePaymentAmount: req.body.advancePaymentAmount || 5000 
-            // We trust the schema defaults for simplicity here.
+            // advancePaymentAmount: req.body.advancePaymentAmount || 5000
         });
 
-        // 3. Link the profile ID back
+        // 3️⃣ Link vendor profile to user account
         user.profileId = vendorProfile._id;
-        await user.save(); 
+        await user.save();
 
+        // 4️⃣ Return success with token
         sendTokenResponse(user, 201, res);
 
     } catch (error) {
@@ -89,36 +110,56 @@ exports.registerVendor = async (req, res, next) => {
         res.status(400).json({ success: false, message: error.message });
     }
 };
+
 // @desc    Login User/Vendor
 // @route   POST /api/auth/login
 // @access  Public
 exports.login = async (req, res, next) => {
     const { email, password } = req.body;
 
-    // Validation
+    // Basic validation
     if (!email || !password) {
         return res.status(400).json({ success: false, message: 'Please provide an email and password' });
     }
 
     try {
-        // Find user by email, explicitly selecting the password field
-        const user = await User.findOne({ email }).select('+password');
+        // Find user by email
+        const user = await User.findOne({ email }).select("+password");
 
         if (!user) {
-            return res.status(401).json({ success: false, message: 'Invalid credentials (User not found)' });
+            return res.status(401).json({ success: false, message: "Invalid email or password" });
         }
 
-        // Check if password matches
+        // Compare passwords
         const isMatch = await user.matchPassword(password);
 
         if (!isMatch) {
-            return res.status(401).json({ success: false, message: 'Invalid credentials (Password mismatch)' });
+            return res.status(401).json({ success: false, message: "Invalid email or password" });
         }
 
+        // 🚨 CHECK: Vendor approval logic
+        if (user.role === "vendor") {
+            const vendorProfile = await VendorProfile.findById(user.profileId);
+
+            if (!vendorProfile) {
+                return res.status(400).json({ success: false, message: "Vendor profile not found" });
+            }
+
+            // Vendor not approved yet
+            if (!vendorProfile.isApproved || vendorProfile.approvalStatus !== "approved") {
+                return res.status(403).json({
+                    success: false,
+                    message: `Your vendor account is still ${vendorProfile.approvalStatus}. Please wait for admin approval.`
+                });
+            }
+        }
+
+        // If passed all checks → login success
         sendTokenResponse(user, 200, res);
-        console.log("Login successful for user:", user);
+        console.log("Login successful:", user.email);
 
     } catch (err) {
-        res.status(500).json({ success: false, message: err.message });     
+        console.error("Login Error:", err);
+        res.status(500).json({ success: false, message: "Server error" });
     }
 };

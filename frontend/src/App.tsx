@@ -4,6 +4,7 @@ import React, { useState, lazy, Suspense, useCallback, useEffect } from 'react';
 import LoginPage from './components/auth/LoginPage';
 import { Toaster } from './components/ui/sonner';
 import ErrorBoundary from './components/ErrorBoundary';
+import AdminDashboard from './admin/AdminDashboard.jsx'
 
 // New Imports
 import { getStoredTokenPayload } from './components/utils/authUtils.js';
@@ -50,7 +51,13 @@ export default function App() {
     setCurrentUser(user);
     if (user.role === 'vendor') {
       setCurrentPage('dashboard');
-    } else {
+    }
+    if (currentUser.role === "admin") {
+  return <AdminDashboard onLogout={handleLogout} />;
+}
+
+    
+    else {
       setCurrentPage('home');
     }
   }, []);
@@ -113,67 +120,73 @@ export default function App() {
     );
   }
 
-  // ---------------------------
-  // ⭐ APP WITH STRIPE WRAPPER ⭐
-  // ---------------------------
-  return (
-    <Elements stripe={stripePromise}>
-      <ErrorBoundary>
-        <div className="min-h-screen bg-background">
-          <Suspense fallback={<LoadingScreen />}>
+ // ---------------------------
+// ⭐ APP WITH STRIPE WRAPPER ⭐
+// ---------------------------
+return (
+  <Elements stripe={stripePromise}>
+    <ErrorBoundary>
+      <div className="min-h-screen bg-background">
+        <Suspense fallback={<LoadingScreen />}>
 
-            {/* Vendor View */}
-            {currentUser.role === 'vendor' ? (
-              currentPage === 'manageServices' ? (
-                <ManageServices
-                  user={currentUser}
-                  onBack={() => setCurrentPage('dashboard')}
-                />
-              ) : (
-                <VendorDashboard
+          {/* ⭐ ADMIN VIEW ⭐ */}
+          {currentUser.role === "admin" ? (
+            <AdminDashboard
+              user={currentUser}
+              onLogout={handleLogout}
+            />
+          ) : currentUser.role === "vendor" ? (
+            /* ⭐ VENDOR VIEW ⭐ */
+            currentPage === 'manageServices' ? (
+              <ManageServices
+                user={currentUser}
+                onBack={() => setCurrentPage('dashboard')}
+              />
+            ) : (
+              <VendorDashboard
+                user={currentUser}
+                onLogout={handleLogout}
+                onNavigateToManageServices={() => setCurrentPage('manageServices')}
+              />
+            )
+          ) : (
+            /* ⭐ CUSTOMER VIEW ⭐ */
+            <>
+              {currentPage === 'home' && (
+                <Dashboard
                   user={currentUser}
                   onLogout={handleLogout}
-                  onNavigateToManageServices={() => setCurrentPage('manageServices')}
+                  onNavigateToBooking={handleNavigateToBooking}
+                  onNavigateHome={() => setCurrentPage('home')}
+                  onNavigateToMyBookings={() => setCurrentPage('myBookings')}
                 />
-              )
-            ) : (
-              <>
-                {/* Customer View */}
-                {currentPage === 'home' && (
-                  <Dashboard
-                    user={currentUser}
-                    onLogout={handleLogout}
-                    onNavigateToBooking={handleNavigateToBooking}
-                    onNavigateHome={() => setCurrentPage('home')}
-                    onNavigateToMyBookings={() => setCurrentPage('myBookings')}
-                  />
-                )}
+              )}
 
-                {currentPage === 'booking' && (
-                  <CustomerBooking
-                    user={currentUser}
-                    category={selectedCategory}
-                    onNavigateHome={() => setCurrentPage('home')}
-                    onLogout={handleLogout}
-                    onNavigateToMyBookings={() => setCurrentPage('myBookings')}
-                  />
-                )}
+              {currentPage === 'booking' && (
+                <CustomerBooking
+                  user={currentUser}
+                  category={selectedCategory}
+                  onNavigateHome={() => setCurrentPage('home')}
+                  onLogout={handleLogout}
+                  onNavigateToMyBookings={() => setCurrentPage('myBookings')}
+                />
+              )}
 
-                {currentPage === 'myBookings' && (
-                  <MyBookings
-                    user={currentUser}
-                    onNavigateHome={() => setCurrentPage('home')}
-                    onLogout={handleLogout}
-                  />
-                )}
-              </>
-            )}
+              {currentPage === 'myBookings' && (
+                <MyBookings
+                  user={currentUser}
+                  onNavigateHome={() => setCurrentPage('home')}
+                  onLogout={handleLogout}
+                />
+              )}
+            </>
+          )}
 
-          </Suspense>
-        </div>
+        </Suspense>
+      </div>
 
-        <Toaster richColors position="top-right" />
-      </ErrorBoundary>
-    </Elements>
-  );
+      <Toaster richColors position="top-right" />
+    </ErrorBoundary>
+  </Elements>
+);
 }

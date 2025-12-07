@@ -1,44 +1,48 @@
 // middleware/auth.js
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const jwt = require("jsonwebtoken");
+const User = require("../models/User");
 
-// Protects routes, ensures user is logged in
+// Middleware to protect routes (Admin, Customer, Vendor)
 exports.protect = async (req, res, next) => {
     let token;
 
-    // Check for token in headers (Bearer <token>)
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-        token = req.headers.authorization.split(' ')[1];
+    // 1️⃣ First check normal user token
+    if (req.headers.authorization?.startsWith("Bearer")) {
+        token = req.headers.authorization.split(" ")[1];
     }
 
-    // Check if token exists
+    // 2️⃣ If not found → check admin token
+    if (!token && req.headers.admintoken) {
+        token = req.headers.admintoken;
+    }
+
     if (!token) {
-        return res.status(401).json({ success: false, message: 'Not authorized to access this route (No token)' });
+        return res.status(401).json({ success: false, message: "No token provided" });
     }
 
     try {
-        // Verify token
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-        // Attach the user (excluding password) to the request object
-        req.user = await User.findById(decoded.id).select('-password');
         
+        req.user = await User.findById(decoded.id).select("-password");
         next();
+
     } catch (err) {
-        console.error(err);
-        return res.status(401).json({ success: false, message: 'Not authorized to access this route (Invalid token)' });
+        console.error("TOKEN VERIFICATION ERROR:", err.message);
+        return res.status(401).json({ success: false, message: "Invalid token" });
     }
 };
 
-// Restricts access based on user role
-exports.authorize = (...roles) => {
-    return (req, res, next) => {
-        if (!roles.includes(req.user.role)) {
-            return res.status(403).json({ 
-                success: false, 
-                message: `User role ${req.user.role} is not authorized to access this route` 
-            });
-        }
-        next();
-    };
+
+// Role-based restriction (Admin, Vendor, Customer)
+exports.authorize = (...allowedRoles) => {
+  return (req, res, next) => {
+    // req.user injected by protect()
+    if (!req.user || !allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: `User role '${req.user?.role}' is not authorized for this route`,
+      });
+    }
+    next();
+  };
 };

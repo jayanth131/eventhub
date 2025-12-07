@@ -109,7 +109,7 @@ export default function ManageServices({ user, onBack }: ManageServicesProps) {
         (user as any)?.id ??
         (user as any);
 
-      const data = await fetchVendorDetailsForCard(userId, selectedDate);
+      const data = await fetchVendorDetailsForCard(user.id, selectedDate);
 
       const mappedServices: Service[] = [
         {

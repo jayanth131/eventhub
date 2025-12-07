@@ -9,45 +9,41 @@ const User = require('../models/User');
 
 exports.getMyProfile = async (req, res) => {
     try {
-        // Fetch User and dynamically populate the profile
-        // The path to populate is simply 'profileId' since refPath handles the dynamic model name.
-        const user = await User.findById(req.user.id).select('email role profileId roleRef')
-            .populate('profileId'); 
-            // IMPORTANT: If you were missing the .populate('profileId'), this would crash! 
-            // The previous code had it, so let's assume the data access is the issue.
+        const user = await User.findById(req.user.id)
+            .select("email role profileId roleRef username")
+            .populate("profileId");
 
         if (!user) {
-            return res.status(404).json({ success: false, message: 'User profile not found.' });
-        }
-        
-        // --- CRITICAL FIX START ---
-        // Access the populated object directly from the user document
-        const populatedProfile = user.profileId; 
-        
-        if (!populatedProfile) {
-             return res.status(500).json({ success: false, message: 'User profile data is missing or corrupted.' });
+            return res.status(404).json({ success: false, message: "User not found" });
         }
 
-        // Extract the actual name based on the role
-        const displayName = (user.role === 'customer') 
-            // Use safe optional chaining: populatedProfile is the full document now
-            ? populatedProfile.name 
-            : populatedProfile.businessName;
-        // --- CRITICAL FIX END ---
+        let displayName;
 
-        res.status(200).json({
+        // 1️⃣ ADMIN → No profile, use username  
+        if (user.role === "admin") {
+            displayName = user.username || "Administrator";
+        }
+        // 2️⃣ CUSTOMER → profile.name
+        else if (user.role === "customer") {
+            displayName = user.profileId?.name || user.username;
+        }
+        // 3️⃣ VENDOR → profile.businessName
+        else if (user.role === "vendor") {
+            displayName = user.profileId?.businessName || user.username;
+        }
+
+        return res.status(200).json({
             success: true,
             data: {
-                id: user.profileId,
+                id: user._id,
                 role: user.role,
                 email: user.email,
-                // The accurate display name
-                name: displayName || 'Unnamed User' // Fallback for safety
+                name: displayName
             }
         });
 
     } catch (err) {
-        console.error("Backend Error in getMyProfile:", err); // Enhanced logging
-        res.status(500).json({ success: false, message: 'Internal server error while fetching profile data.' });
+        console.error("getMyProfile ERROR:", err);
+        return res.status(500).json({ success: false, message: "Server error" });
     }
 };

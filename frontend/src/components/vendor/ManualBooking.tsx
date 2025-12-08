@@ -20,7 +20,7 @@ import { toast } from 'sonner@2.0.3';
 
 // <-- use your service file (the one that exports submitBooking)
 // path chosen to match your code above; adjust if your path differs
-import { submitBooking } from '../services/vendorservice';
+import { submitBooking } from '../services/vendorService.js';
 
 interface ManualBookingProps {
   vendorId?: string; // optional - include when a customer is booking

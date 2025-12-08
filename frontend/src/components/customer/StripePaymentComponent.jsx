@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { toast } from "react-hot-toast";
+import BASE_URL from "../config/api"; // ✅ import central base url
 
 const StripePaymentComponent = ({ amount, bookingPayload, onSuccess }) => {
   const stripe = useStripe();
@@ -14,8 +15,8 @@ const StripePaymentComponent = ({ amount, bookingPayload, onSuccess }) => {
     toast.loading("Processing secure payment…");
 
     try {
-      // 1️⃣ Create Payment Intent (advance)
-      const res = await fetch("http://localhost:5000/api/payments/create-intent", {
+      // ✅ 1️⃣ Create Payment Intent (advance)
+      const res = await fetch(`${BASE_URL}/api/payments/create-intent`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -29,11 +30,13 @@ const StripePaymentComponent = ({ amount, bookingPayload, onSuccess }) => {
       });
 
       const data = await res.json();
-      if (!data.success) throw new Error("Unable to initiate payment");
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Unable to initiate payment");
+      }
 
       const clientSecret = data.clientSecret;
 
-      // 2️⃣ Confirm Payment
+      // ✅ 2️⃣ Confirm Payment
       const result = await stripe.confirmCardPayment(clientSecret, {
         payment_method: {
           card: elements.getElement(CardElement),
@@ -51,13 +54,9 @@ const StripePaymentComponent = ({ amount, bookingPayload, onSuccess }) => {
         toast.dismiss();
         toast.success("Advance payment successful!");
 
-        // ⭐ DO NOT SEND TO BACKEND HERE
-        // Because booking DOES NOT exist yet!
-
-        // 3️⃣ Instead, return paymentIntentId to parent
+        // ✅ Return paymentIntentId to parent
         onSuccess(result.paymentIntent.id);
       }
-
     } catch (err) {
       toast.dismiss();
       toast.error("Payment failed: " + err.message);

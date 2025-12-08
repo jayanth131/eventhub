@@ -1,124 +1,132 @@
-const VENDOR_API_URL = 'http://localhost:5000/api/vendors';
-const BOOKING_API_URL = 'http://localhost:5000/api/bookings'; // New URL for clarity
-const VENDOR_DASHBOARD_URL = 'http://localhost:5000/api/vendor'; // New URL for clarity
+import BASE_URL from "../config/api";
 
-const getToken = () => localStorage.getItem('authToken');
+// ✅ Centralized API URLs
+const VENDOR_API_URL = `${BASE_URL}/api/vendors`;
+const BOOKING_API_URL = `${BASE_URL}/api/bookings`;
+const VENDOR_DASHBOARD_URL = `${BASE_URL}/api/vendor`;
 
-// Helper for authenticated requests
-const fetchAuthenticated = async (url, method = 'GET', body = null) => {
-    const token = getToken();
-    if (!token) throw new Error("Authentication required. Please log in.");
+const getToken = () => localStorage.getItem("authToken");
 
-    const headers = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-    };
+// ✅ Helper for authenticated requests
+const fetchAuthenticated = async (url, method = "GET", body = null) => {
+  const token = getToken();
+  if (!token) throw new Error("Authentication required. Please log in.");
 
-    const config = { method, headers };
-    if (body) config.body = JSON.stringify(body);
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+  };
 
-    const response = await fetch(url, config);
+  const config = { method, headers };
+  if (body) config.body = JSON.stringify(body);
 
-    if (response.status === 204) return { success: true };
+  const response = await fetch(url, config);
 
-    const data = await response.json();
+  if (response.status === 204) return { success: true };
 
-    if (!response.ok) {
-        throw new Error(data.message || `API call failed with status: ${response.status}`);
-    }
-    return data;
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || `API call failed with status: ${response.status}`);
+  }
+
+  return data;
 };
 
 /**
- * 1. Fetches the initial list of vendors for the search results (fast load).
- * @param {string} category 
- * @param {string} location 
- * @returns {Promise<{id, businessName, location, totalCost, averageRating, imageUrls, description}[]>}
+ * 1. Fetches the initial list of vendors for the search results (PUBLIC)
  */
 export const fetchVendorList = async (category, location) => {
-    // FIX: Include both category and location in the URLSearchParams
-    const params = new URLSearchParams({});
-    if (category) params.append('category', category);
-    if (location) params.append('location', location);
+  const params = new URLSearchParams({});
+  if (category) params.append("category", category);
+  if (location) params.append("location", location);
 
-    const endpoint = `${VENDOR_API_URL}?${params.toString()}`;
-    console.log("API URL sent:", endpoint);
+  const endpoint = `${VENDOR_API_URL}?${params.toString()}`;
+  console.log("API URL sent:", endpoint);
 
-    // NOTE: This endpoint is PUBLIC, no token needed
-    const response = await fetch(endpoint);
+  const response = await fetch(endpoint);
 
-    if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `List fetch failed with status: ${response.status}`);
-    }
-    const data = await response.json();
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.message || `List fetch failed with status: ${response.status}`);
+  }
 
-    return data.data;
+  const data = await response.json();
+  return data.data;
 };
 
 /**
- * 2. Fetches all slots, pricing, and contact info for a single vendor (on card click/expansion).
- * @param {string} vendorId 
- * @param {string} selectedDate - YYYY-MM-DD format
- * @returns {Promise<{id, totalCost, advancePaymentAmount, availability, contactEmail}>}
+ * 2. Fetch vendor details for card (PROTECTED)
  */
-export const fetchVendorDetailsForCard = async (vendorId,selectedDate) => {
-    // const selectedDate = "2024-10-05"; // Example date for testing
-    // CRITICAL FIX: Append the date to the query string
-    console.log("Selected date for details fetch:", selectedDate);
-    const dateQuery = selectedDate ? `?date=${selectedDate}` : '';
-    const endpoint = `${VENDOR_API_URL}/${vendorId}/details/card${dateQuery}`;
+export const fetchVendorDetailsForCard = async (vendorId, selectedDate) => {
+  console.log("Selected date for details fetch:", selectedDate);
 
-    // This endpoint is PROTECTED
-    const response = await fetchAuthenticated(endpoint);
-    console.log("Vendor details fetched:", response);
-    return response;
+  const dateQuery = selectedDate ? `?date=${selectedDate}` : "";
+  const endpoint = `${VENDOR_API_URL}/${vendorId}/details/card${dateQuery}`;
+
+  const response = await fetchAuthenticated(endpoint);
+  console.log("Vendor details fetched:", response);
+  return response;
 };
 
 /**
- * 3. Handles the final booking submission.
- * @param {object} bookingData 
+ * 3. Submit final booking (PROTECTED)
  */
 export const submitBooking = async (bookingData) => {
-    const endpoint = 'http://localhost:5000/api/bookings';
-    // This endpoint is PROTECTED
-    return fetchAuthenticated(endpoint, 'POST', bookingData);
+  const endpoint = `${BOOKING_API_URL}`;
+  return fetchAuthenticated(endpoint, "POST", bookingData);
 };
+
+/**
+ * 4. Fetch customer bookings (PROTECTED)
+ */
 export const fetchCustomerBookings = async () => {
-    const endpoint = `${BOOKING_API_URL}/me`;
-    const response = await fetchAuthenticated(endpoint);
-    return response.data; // Return the array of transformed bookings
+  const endpoint = `${BOOKING_API_URL}/me`;
+  const response = await fetchAuthenticated(endpoint);
+  return response.data;
 };
 
+/**
+ * 5. Fetch vendor dashboard summary (PROTECTED)
+ */
 export const fetchVendorDashboardSummary = async () => {
-    const endpoint = `${VENDOR_DASHBOARD_URL}/summary`;
-    const response = await fetchAuthenticated(endpoint);
-    return response.data; // Returns the metrics object
+  const endpoint = `${VENDOR_DASHBOARD_URL}/summary`;
+  const response = await fetchAuthenticated(endpoint);
+  return response.data;
 };
 
+/**
+ * 6. Mark booking as completed (PROTECTED)
+ */
 export const markBookingAsCompleted = async (bookingId) => {
   const endpoint = `${BOOKING_API_URL}/complete/${bookingId}`;
-  const response = await fetchAuthenticated(endpoint, 'PUT');
-  return response.data; // returns updated booking object
+  const response = await fetchAuthenticated(endpoint, "PUT");
+  return response.data;
 };
 
+/**
+ * 7. Update vendor active status (PROTECTED)
+ */
 export const updateVendorActiveStatusAPI = async (vendorId, newStatus) => {
-    const endpoint = `${VENDOR_API_URL}/${vendorId}/active-status`;
-    const body = { ActiveStatus: newStatus };
-    const response = await fetchAuthenticated(endpoint, 'PUT', body);
-    return response; // returns updated vendor object
+  const endpoint = `${VENDOR_API_URL}/${vendorId}/active-status`;
+  const body = { ActiveStatus: newStatus };
+  const response = await fetchAuthenticated(endpoint, "PUT", body);
+  return response;
 };
 
+/**
+ * 8. Update vendor slots (PROTECTED)
+ */
 export const updateVendorSlotsAPI = async (vendorId, slots, date) => {
   const token = localStorage.getItem("authToken");
 
-  const res = await fetch(`http://localhost:5000/api/vendor/update-slots`, {
+  const res = await fetch(`${VENDOR_DASHBOARD_URL}/update-slots`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`
+      Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ vendorId, slots, date })
+    body: JSON.stringify({ vendorId, slots, date }),
   });
 
   return res.json();

@@ -1,7 +1,9 @@
-const API = "http://localhost:5000/api/admin";
+import BASE_URL from "../components/config/api";
+
+const API = `${BASE_URL}/api/admin`;
 
 // ---------------------------
-// ADMIN LOGIN
+// ✅ ADMIN LOGIN
 // ---------------------------
 export const adminLogin = async (email, password) => {
   const res = await fetch(`${API}/login`, {
@@ -12,7 +14,7 @@ export const adminLogin = async (email, password) => {
 
   const data = await res.json();
 
-  // Save the token properly
+  // ✅ Save token properly
   if (data.success && data.token) {
     localStorage.setItem("authToken", data.token);
   }
@@ -21,11 +23,11 @@ export const adminLogin = async (email, password) => {
 };
 
 // ---------------------------
-// GET PENDING VENDORS
+// ✅ GET PENDING VENDORS
 // ---------------------------
 export const getPendingVendors = async () => {
   const token = localStorage.getItem("authToken");
-  console.log("token:",token)
+  console.log("token:", token);
 
   const res = await fetch(`${API}/vendors/pending`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -35,7 +37,7 @@ export const getPendingVendors = async () => {
 };
 
 // ---------------------------
-// APPROVE VENDOR
+// ✅ APPROVE VENDOR
 // ---------------------------
 export const approveVendor = async (id) => {
   const token = localStorage.getItem("authToken");
@@ -49,7 +51,7 @@ export const approveVendor = async (id) => {
 };
 
 // ---------------------------
-// REJECT VENDOR
+// ✅ REJECT VENDOR
 // ---------------------------
 export const rejectVendor = async (id) => {
   const token = localStorage.getItem("authToken");
@@ -62,18 +64,28 @@ export const rejectVendor = async (id) => {
   return res.json();
 };
 
+// ---------------------------
+// ✅ GET APPROVED VENDORS
+// ---------------------------
 export const getApprovedVendors = async () => {
   const token = localStorage.getItem("authToken");
+
   const res = await fetch(`${API}/vendors/approved`, {
     headers: { Authorization: `Bearer ${token}` },
   });
+
   return res.json();
 };
 
+// ---------------------------
+// ✅ GET REJECTED VENDORS
+// ---------------------------
 export const getRejectedVendors = async () => {
   const token = localStorage.getItem("authToken");
+
   const res = await fetch(`${API}/vendors/rejected`, {
     headers: { Authorization: `Bearer ${token}` },
   });
+
   return res.json();
 };

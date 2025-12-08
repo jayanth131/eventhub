@@ -239,3 +239,8 @@ div[role="dialog"] {
   overflow-y: auto !important;
   -webkit-overflow-scrolling: touch !important;
 }
+
+button[data-state="active"] {
+  background-color: var(--royal-maroon) !important;
+  color: white !important;
+}

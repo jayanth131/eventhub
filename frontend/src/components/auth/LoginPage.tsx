@@ -38,6 +38,8 @@ const FloatingParticle = ({ delay = 0, position = 0 }) => (
 );
 
 export default function LoginPage({ onLogin }) {
+
+  
   const [isSignUp, setIsSignUp] = useState(false);
   const [userType, setUserType] = useState("customer");
   const [isAdminLogin, setIsAdminLogin] = useState(false);
@@ -56,6 +58,8 @@ export default function LoginPage({ onLogin }) {
     location: "",
     category: VENDOR_CATEGORIES[0],
   });
+
+
 
   // ADMIN form
   const [adminData, setAdminData] = useState({
@@ -251,10 +255,41 @@ export default function LoginPage({ onLogin }) {
               {!isAdminLogin && (
                 <>
                   <Tabs value={userType} onValueChange={setUserType} className="mt-6">
-                    <TabsList className="grid grid-cols-2 bg-[var(--royal-cream)] p-1">
-                      <TabsTrigger value="customer">Customer</TabsTrigger>
-                      <TabsTrigger value="vendor">Vendor</TabsTrigger>
-                    </TabsList>
+<TabsList className="grid grid-cols-2 bg-white p-1 rounded-xl shadow-sm border border-[var(--royal-gold)]/30">
+
+  <TabsTrigger
+    value="customer"
+    className="
+      text-[var(--royal-maroon)]
+      transition-all duration-300
+      data-[state=active]:bg-gradient-to-r
+      data-[state=active]:from-[var(--royal-maroon)]
+      data-[state=active]:to-[var(--royal-copper)]
+      data-[state=active]:text-white
+      rounded-lg
+    "
+  >
+    Customer
+  </TabsTrigger>
+
+  <TabsTrigger
+    value="vendor"
+    className="
+      text-[var(--royal-maroon)]
+      transition-all duration-300
+      data-[state=active]:bg-gradient-to-r
+      data-[state=active]:from-[var(--royal-maroon)]
+      data-[state=active]:to-[var(--royal-copper)]
+      data-[state=active]:text-white
+      rounded-lg
+    "
+  >
+    Vendor
+  </TabsTrigger>
+
+</TabsList>
+
+
 
                     <TabsContent value={userType}>
                       <form onSubmit={handleSubmit} className="space-y-4 mt-6">

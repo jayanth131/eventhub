@@ -107,37 +107,58 @@ export default function LoginPage({ onLogin }) {
       // =======================
       let response;
 
-      if (isSignUp) {
-        const payload = {
-          username: formData.username,
-          email: formData.email,
-          password: formData.password,
-          name: formData.name,
-          phone: formData.phone,
-          location: formData.location,
-        };
+     if (isSignUp) {
+  const payload = {
+    username: formData.username,
+    email: formData.email,
+    password: formData.password,
+    name: formData.name,
+    phone: formData.phone,
+    location: formData.location,
+  };
 
-        if (userType === "vendor") {
-          payload.businessName = formData.businessName;
-          payload.category = formData.category;
-        }
+  if (userType === "vendor") {
+    payload.businessName = formData.businessName;
+    payload.category = formData.category;
+  }
 
-        response = await registerUser(payload, userType);
-      } else {
-        response = await loginUser(formData.email, formData.password);
-      }
+  const signupResponse = await registerUser(payload, userType);
 
-      if (!response.success) throw new Error(response.message);
+  if (!signupResponse.success) {
+    throw new Error(signupResponse.message);
+  }
 
-      localStorage.setItem("authToken", response.token);
+  // ✅ AFTER SUCCESSFUL SIGNUP:
+  // 1. Switch to Login mode
+  // 2. Clear password field
+  // 3. Show success message
+  setIsSignUp(false);
+  setFormData(prev => ({
+    ...prev,
+    password: ""
+  }));
 
-      onLogin({
-        id: response.userId,
-        name: formData.name || formData.username || formData.email,
-        email: formData.email,
-        role: response.role,
-        profileId: response.profileId,
-      });
+  setError("");
+  alert("✅ Account created successfully! Please login.");
+
+  setLoading(false);
+  return; // 🔥 STOP HERE — DO NOT AUTO-LOGIN
+} else {
+  // ✅ NORMAL LOGIN FLOW
+  response = await loginUser(formData.email, formData.password);
+
+  if (!response.success) throw new Error(response.message);
+
+  localStorage.setItem("authToken", response.token);
+
+  onLogin({
+    id: response.userId,
+    name: formData.name || formData.username || formData.email,
+    email: formData.email,
+    role: response.role,
+    profileId: response.profileId,
+  });
+}
 
     } catch (err) {
       setError(err.message || "Login failed.");
